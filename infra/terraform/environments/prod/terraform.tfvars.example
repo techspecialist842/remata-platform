@@ -1,0 +1,3 @@
+aws_region      = "us-east-1" # BLOCKED: pending client decision
+container_image = ""          # BLOCKED: only exists after first CI image push
+alert_email     = ""          # BLOCKED: required before prod go-live — pending ops stakeholder

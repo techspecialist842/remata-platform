@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  api:
+    name: API — lint, test, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/api/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test -- --ci
+      - run: npm run build
+
+      - name: Build Docker image (no push — validates the Dockerfile only)
+        run: docker build -t remata-api:ci .
+
+  terraform:
+    name: Terraform — fmt & validate
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        stack: [bootstrap, environments/dev, environments/staging, environments/prod]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.9.8'
+
+      - name: terraform fmt -check
+        working-directory: infra/terraform/${{ matrix.stack }}
+        run: terraform fmt -check -diff
+
+      - name: terraform init (no backend — syntax/reference check only)
+        working-directory: infra/terraform/${{ matrix.stack }}
+        run: terraform init -backend=false -input=false
+
+      - name: terraform validate
+        working-directory: infra/terraform/${{ matrix.stack }}
+        run: terraform validate

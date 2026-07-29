@@ -1,0 +1,91 @@
+name: Deploy API
+
+# Auto-deploys to staging on every push to main. Dev/prod are manual —
+# prod additionally requires whoever configures the repo's "prod" GitHub
+# Environment to add required reviewers (Settings > Environments), since
+# that's not something Terraform/this workflow can set on its own.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        type: choice
+        options: [dev, staging, prod]
+        default: staging
+
+permissions:
+  id-token: write # required for OIDC — no long-lived AWS keys in secrets
+  contents: read
+
+jobs:
+  build-and-push:
+    name: Build & push image
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'staging' }}
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr-login
+
+      - name: Build, tag, push
+        id: build
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          ECR_REPOSITORY: remata-api
+          ENVIRONMENT: ${{ inputs.environment || 'staging' }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:${ENVIRONMENT}-${IMAGE_TAG}"
+          docker build -t "$IMAGE_URI" .
+          docker push "$IMAGE_URI"
+          echo "image=$IMAGE_URI" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Deploy to ECS
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'staging' }}
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Render new task definition
+        id: render
+        env:
+          ENVIRONMENT: ${{ inputs.environment || 'staging' }}
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "remata-${ENVIRONMENT}-api" \
+            --query taskDefinition > task-definition.json
+
+      - uses: aws-actions/amazon-ecs-render-task-definition@v1
+        id: task-def
+        with:
+          task-definition: task-definition.json
+          container-name: api
+          image: ${{ needs.build-and-push.outputs.image }}
+
+      - uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: remata-${{ inputs.environment || 'staging' }}-api
+          cluster: remata-${{ inputs.environment || 'staging' }}
+          wait-for-service-stability: true

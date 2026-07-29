@@ -1,0 +1,22 @@
+# Node / NestJS
+node_modules/
+dist/
+coverage/
+*.log
+npm-debug.log*
+
+# Terraform
+**/.terraform/
+# .terraform.lock.hcl is intentionally NOT ignored — commit it for
+# reproducible provider version resolution across machines/CI.
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+**/terraform.tfvars
+**/backend.hcl
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/

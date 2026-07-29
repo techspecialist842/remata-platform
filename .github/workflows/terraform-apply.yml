@@ -1,0 +1,75 @@
+name: Terraform Apply (infra changes)
+
+# Manual only, on purpose — infra changes (VPC/RDS/ALB/IAM) are higher
+# blast-radius than an app deploy and use a separate, more privileged role
+# (see infra/terraform/bootstrap). Configure a GitHub Environment named
+# "infra-<env>" with required reviewers (Settings > Environments) to force
+# a human approval before this can run against staging/prod.
+on:
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: 'Which stack'
+        type: choice
+        options: [bootstrap, dev, staging, prod]
+        required: true
+      action:
+        description: 'plan or apply'
+        type: choice
+        options: [plan, apply]
+        default: plan
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    name: terraform ${{ inputs.action }} — ${{ inputs.stack }}
+    runs-on: ubuntu-latest
+    environment: infra-${{ inputs.stack }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.stack == 'bootstrap' && 'infra/terraform/bootstrap' || format('infra/terraform/environments/{0}', inputs.stack) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.9.8'
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: terraform init
+        run: |
+          if [ "${{ inputs.stack }}" = "bootstrap" ]; then
+            terraform init -input=false
+          else
+            terraform init -input=false \
+              -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+              -backend-config="key=${{ inputs.stack }}/terraform.tfstate" \
+              -backend-config="region=${{ vars.AWS_REGION }}" \
+              -backend-config="dynamodb_table=${{ vars.TF_LOCK_TABLE }}"
+          fi
+
+      - name: Build -var flags (environment stacks only)
+        id: vars
+        if: inputs.stack != 'bootstrap'
+        env:
+          CONTAINER_IMAGE: ${{ vars.CONTAINER_IMAGE_INITIAL || 'public.ecr.aws/docker/library/hello-world:latest' }}
+        run: |
+          echo "flags=-var=aws_region=${{ vars.AWS_REGION }} -var=container_image=$CONTAINER_IMAGE -var=alert_email=${{ vars.ALERT_EMAIL || '' }}" >> "$GITHUB_OUTPUT"
+          # container_image only matters on the very first apply — the ECS
+          # service's task_definition is ignore_changes'd afterward, so
+          # real deploys always go through deploy.yml, never through here.
+
+      - name: terraform plan
+        run: terraform plan -input=false ${{ steps.vars.outputs.flags }} -out=tfplan
+
+      - name: terraform apply
+        if: inputs.action == 'apply'
+        run: terraform apply -input=false -auto-approve tfplan

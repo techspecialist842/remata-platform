@@ -1,0 +1,5 @@
+bucket         = "remata-terraform-state"
+key            = "prod/terraform.tfstate"
+region         = "us-east-1" # must match bootstrap's aws_region
+dynamodb_table = "remata-terraform-locks"
+encrypt        = true

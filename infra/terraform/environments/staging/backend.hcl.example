@@ -1,0 +1,7 @@
+# Copy to backend.hcl (git-ignored) after `terraform apply` in ../../bootstrap,
+# filling in that stack's outputs. Then: terraform init -backend-config=backend.hcl
+bucket         = "remata-terraform-state"
+key            = "staging/terraform.tfstate"
+region         = "us-east-1" # must match bootstrap's aws_region
+dynamodb_table = "remata-terraform-locks"
+encrypt        = true
