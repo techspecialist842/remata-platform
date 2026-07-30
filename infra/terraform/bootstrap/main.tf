@@ -82,17 +82,18 @@ resource "aws_ecr_lifecycle_policy" "api" {
 # AWS access key stored in GitHub secrets.
 # ---------------------------------------------------------------------------
 
+# Computed live from GitHub's actual certificate chain rather than
+# hand-typed — a hand-typed thumbprint here previously caused every OIDC
+# assume-role call to fail with a generic "not authorized" error.
+data "tls_certificate" "github_actions" {
+  url = "https://token.actions.githubusercontent.com/.well-known/openid-configuration"
+}
+
 resource "aws_iam_openid_connect_provider" "github" {
   url = "https://token.actions.githubusercontent.com"
 
-  client_id_list = ["sts.amazonaws.com"]
-
-  # GitHub's OIDC intermediate has rotated before; both thumbprints are kept
-  # for continuity (AWS also validates via the configured client_id_list).
-  thumbprint_list = [
-    "6938fd4d98bab03faadb97b34396831e3780aea1",
-    "1c58a3a8518e8759bf075b76b750d4f2df264fcd",
-  ]
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.github_actions.certificates[0].sha1_fingerprint]
 }
 
 data "aws_iam_policy_document" "github_actions_trust" {
@@ -113,10 +114,19 @@ data "aws_iam_policy_document" "github_actions_trust" {
 
     # Restricts to this exact repo, any branch/tag/environment. Tighten to
     # ref:refs/heads/main if only main should ever be able to deploy.
+    #
+    # GitHub's OIDC `sub` claim currently includes numeric owner/repo IDs
+    # (repo:OWNER@ID/REPO@ID:...), confirmed by decoding an actual issued
+    # token — verified empirically, not from documentation, since this
+    # differs from the plain repo:OWNER/REPO:... format widely documented
+    # elsewhere. Both forms are matched here in case that ever reverts.
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_org}/${var.github_repo}:*"]
+      values = [
+        "repo:${var.github_org}/${var.github_repo}:*",
+        "repo:${var.github_org}@*/${var.github_repo}@*:*",
+      ]
     }
   }
 }

@@ -12,9 +12,10 @@ npm-debug.log*
 *.tfstate
 *.tfstate.*
 *.tfplan
-tfplan
+tfplan*
 **/terraform.tfvars
 **/backend.hcl
+**/fix-*.ps1
 
 # OS / editor
 .DS_Store
