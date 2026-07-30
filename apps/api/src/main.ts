@@ -8,12 +8,21 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // swagger-ui-bundle.js uses `new Function(...)` internally, which CSP
-  // treats like eval() -- strict default CSP silently breaks Swagger UI
-  // rendering (assets load fine, but SwaggerUIBundle never initializes).
-  // Loosen CSP only under /api/docs; keep strict defaults everywhere else.
-  const strictHelmet = helmet();
+  // Helmet's HSTS header (Strict-Transport-Security) tells browsers to
+  // force every future request on this origin to HTTPS -- but there is no
+  // HTTPS listener until a domain is configured (see infra/terraform
+  // modules/alb). Sending it anyway silently breaks the site: the first
+  // response's header makes the browser upgrade every subsequent
+  // sub-resource request to :443, which then fails outright with
+  // net::ERR_CONNECTION_REFUSED. Disabled until HTTPS actually exists.
+  //
+  // swagger-ui-bundle.js also uses `new Function(...)` internally, which
+  // CSP treats like eval() -- strict default CSP silently breaks Swagger
+  // UI rendering. Loosen CSP only under /api/docs; keep strict defaults
+  // everywhere else.
+  const strictHelmet = helmet({ hsts: false });
   const relaxedHelmet = helmet({
+    hsts: false,
     contentSecurityPolicy: {
       directives: {
         defaultSrc: [`'self'`],
