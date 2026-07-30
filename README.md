@@ -2,6 +2,8 @@
 
 Esqueleto de plataforma (Fase 0: validación de arquitectura y fundación) para el marketplace REMATA.
 
+**Staging está en vivo:** `http://remata-staging-208896587.us-east-2.elb.amazonaws.com/api/health` → `200 OK`. Ese es el criterio de aceptación central de Fase 0, cumplido.
+
 Este repositorio es **público**. Los documentos de negocio, especificaciones técnicas, RFP/procurement y el plan de fases (`REMATA_Plan_Revisado.pdf`) son confidenciales y viven en el repositorio privado separado `techspecialist842/remata-docs` — no se suben acá.
 
 ## Qué contiene este repositorio
@@ -46,11 +48,22 @@ El usuario IAM `terraform-bootstrap` usado para ese apply único ya fue desactiv
 3. **Dominio + certificado ACM**, si se quiere HTTPS real en vez de solo el DNS del ALB.
 4. **Estructura de cuentas a futuro**: por ahora dev/staging/prod comparten la misma cuenta de AWS (más rápido para llegar a Fase 0); migrar a cuentas separadas por entorno es posible más adelante sin rehacer los módulos.
 
-## Cómo seguir desde acá
+## Estado actual — staging ya aplicado
 
-1. Push a `main` → `ci.yml` corre, y `deploy.yml` construye/publica la primera imagen a ECR (ya tiene todo lo que necesita: los 5 Variables están configurados).
-2. Disparar manualmente `terraform-apply.yml` (stack: `staging`, action: `apply`) para crear la VPC/RDS/ALB/ECS de staging, usando esa primera imagen.
-3. Confirmar `http://<alb_dns_name>/api/health` responde `200` — ese es el criterio de aceptación de Fase 0.
+El stack `infra/terraform/environments/staging` ya se ejecutó completo contra AWS: VPC, subnets, NAT gateway, security groups, RDS Postgres, ALB, ECS cluster/service/task, dashboard + alarmas de CloudWatch. Health check verificado en `http://remata-staging-208896587.us-east-2.elb.amazonaws.com/api/health`.
+
+Bugs reales encontrados y corregidos durante los intentos de apply (no solo teóricos — cada uno bloqueó un apply real):
+
+- El `sub` claim que emite GitHub para OIDC incluye IDs numéricos (`repo:OWNER@ID/REPO@ID:...`), no el formato `repo:OWNER/REPO:...` que la mayoría de la documentación muestra — la política de confianza no lo contemplaba.
+- Descripciones de Security Group con guión largo (—); la API de EC2 rechaza caracteres no-ASCII en `GroupDescription`.
+- Al rol de Terraform le faltaban `iam:ListRolePolicies` / `iam:ListAttachedRolePolicies` (necesarios para que Terraform lea de vuelta los roles que acaba de crear) y `iam:CreateServiceLinkedRole` (RDS necesita crear su service-linked role la primera vez que se usa en la cuenta).
+- `engine_version = "16.4"` de Postgres ya no existe en RDS; se cambió a solo la versión mayor (`"16"`).
+
+## Cómo seguir desde acá (dev / prod)
+
+1. Push a `main` → `ci.yml` corre, y `deploy.yml` construye/publica la imagen a ECR automáticamente.
+2. Disparar manualmente `terraform-apply.yml` (stack: `dev` o `prod`, action: `apply`) para crear esos entornos — mismos módulos que staging, debería aplicar limpio ya que los bugs de arriba están corregidos en el código compartido.
+3. Confirmar `http://<alb_dns_name>/api/health` responde `200`.
 
 ## Qué falta a propósito (fuera de alcance de Fase 0)
 
