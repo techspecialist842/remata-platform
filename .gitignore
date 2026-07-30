@@ -16,6 +16,7 @@ tfplan*
 **/terraform.tfvars
 **/backend.hcl
 **/fix-*.ps1
+**/create-*.ps1
 
 # OS / editor
 .DS_Store

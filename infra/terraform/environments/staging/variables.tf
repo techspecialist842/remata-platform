@@ -25,13 +25,13 @@ variable "alert_email" {
 }
 
 variable "domain_name" {
-  description = "Optional. e.g. staging.remata.com. Leave empty to stay HTTP-only."
+  description = "Optional. e.g. staging.remata.app. Leave empty to stay HTTP-only. DNS is managed externally (Cloudflare)."
   type        = string
   default     = ""
 }
 
-variable "route53_zone_name" {
-  description = "Optional. Existing Route53 zone (e.g. remata.com) that domain_name belongs to. Required if domain_name is set."
-  type        = string
-  default     = ""
+variable "activate_https" {
+  description = "Set true only after the ACM cert shows ISSUED (see module.alb.acm_certificate_status)."
+  type        = bool
+  default     = false
 }

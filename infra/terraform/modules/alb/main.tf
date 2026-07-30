@@ -40,18 +40,22 @@ resource "aws_lb_target_group" "api" {
 }
 
 locals {
-  has_domain = var.domain_name != ""
+  has_domain   = var.domain_name != ""
+  https_active = local.has_domain && var.activate_https
 }
 
-# HTTP listener: forwards directly to the target group until a domain is
-# set, then switches to a 301 redirect to HTTPS instead.
+# HTTP listener: forwards directly to the target group until HTTPS is
+# actually live (cert issued + activate_https flipped true), then switches
+# to a 301 redirect. Keeping it as "forward" during the cert-request
+# window means http://<domain> already works the moment DNS is pointed at
+# the ALB, even before the certificate validates.
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.this.arn
   port              = 80
   protocol          = "HTTP"
 
   dynamic "default_action" {
-    for_each = local.has_domain ? [] : [1]
+    for_each = local.https_active ? [] : [1]
     content {
       type             = "forward"
       target_group_arn = aws_lb_target_group.api.arn
@@ -59,7 +63,7 @@ resource "aws_lb_listener" "http" {
   }
 
   dynamic "default_action" {
-    for_each = local.has_domain ? [1] : []
+    for_each = local.https_active ? [1] : []
     content {
       type = "redirect"
       redirect {
@@ -71,11 +75,15 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-data "aws_route53_zone" "this" {
-  count = local.has_domain ? 1 : 0
-  name  = var.route53_zone_name
-}
-
+# DNS is managed externally (Cloudflare), not Route53 -- this module only
+# requests the certificate and reports what to configure. Two manual DNS
+# steps at the external provider, once per domain:
+#   1. Add the CNAME from acm_validation_record output (validates the cert)
+#   2. Point the domain at alb_dns_name output (CNAME, or Cloudflare's
+#      "CNAME flattening" if it's an apex domain)
+# Terraform intentionally does NOT wait for validation (aws_acm_certificate_
+# validation would block/timeout on records it can't see or create) --
+# apply again with activate_https=true once the cert shows ISSUED in ACM.
 resource "aws_acm_certificate" "this" {
   count             = local.has_domain ? 1 : 0
   domain_name       = var.domain_name
@@ -91,49 +99,13 @@ resource "aws_acm_certificate" "this" {
   }
 }
 
-resource "aws_route53_record" "cert_validation" {
-  for_each = local.has_domain ? {
-    for dvo in aws_acm_certificate.this[0].domain_validation_options : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      record = dvo.resource_record_value
-      type   = dvo.resource_record_type
-    }
-  } : {}
-
-  allow_overwrite = true
-  name            = each.value.name
-  records         = [each.value.record]
-  ttl             = 60
-  type            = each.value.type
-  zone_id         = data.aws_route53_zone.this[0].zone_id
-}
-
-resource "aws_acm_certificate_validation" "this" {
-  count                   = local.has_domain ? 1 : 0
-  certificate_arn         = aws_acm_certificate.this[0].arn
-  validation_record_fqdns = [for r in aws_route53_record.cert_validation : r.fqdn]
-}
-
-resource "aws_route53_record" "alb_alias" {
-  count   = local.has_domain ? 1 : 0
-  zone_id = data.aws_route53_zone.this[0].zone_id
-  name    = var.domain_name
-  type    = "A"
-
-  alias {
-    name                   = aws_lb.this.dns_name
-    zone_id                = aws_lb.this.zone_id
-    evaluate_target_health = true
-  }
-}
-
 resource "aws_lb_listener" "https" {
-  count             = local.has_domain ? 1 : 0
+  count             = local.https_active ? 1 : 0
   load_balancer_arn = aws_lb.this.arn
   port              = 443
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-  certificate_arn   = aws_acm_certificate_validation.this[0].certificate_arn
+  certificate_arn   = aws_acm_certificate.this[0].arn
 
   default_action {
     type             = "forward"

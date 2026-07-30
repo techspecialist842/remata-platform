@@ -1,5 +1,5 @@
-aws_region        = "us-east-2"
-container_image   = "" # <ecr_repo_url>:dev-<sha>, from ECR after a CI image push
-alert_email       = ""
-domain_name       = "" # optional, e.g. dev.remata.com -- leave empty for HTTP-only
-route53_zone_name = "" # required if domain_name is set, e.g. remata.com
+aws_region      = "us-east-2"
+container_image = "" # <ecr_repo_url>:dev-<sha>, from ECR after a CI image push
+alert_email     = ""
+domain_name     = "" # optional, e.g. dev.remata.app -- leave empty for HTTP-only. DNS is Cloudflare, not Route53.
+activate_https  = false # flip true only after the ACM cert shows ISSUED (add the CNAME from acm_validation_record at Cloudflare first)

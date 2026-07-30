@@ -32,7 +32,7 @@ module "alb" {
   public_subnet_ids = module.network.public_subnet_ids
   security_group_id = module.security_groups.alb_sg_id
   domain_name       = var.domain_name
-  route53_zone_name = var.route53_zone_name
+  activate_https    = var.activate_https
 }
 
 module "ecs_service" {

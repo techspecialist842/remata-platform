@@ -25,13 +25,13 @@ variable "health_check_path" {
 }
 
 variable "domain_name" {
-  description = "Optional. FQDN to serve this environment on (e.g. staging.remata.com). Leave empty to stay HTTP-only on the ALB's raw DNS name -- the default until a domain is confirmed."
+  description = "Optional. FQDN to serve this environment on (e.g. staging.remata.app). Leave empty to stay HTTP-only on the ALB's raw DNS name -- the default until a domain is confirmed. DNS is managed externally (Cloudflare) -- see acm_validation_record output for what to configure."
   type        = string
   default     = ""
 }
 
-variable "route53_zone_name" {
-  description = "Optional. Existing Route53 public hosted zone name (e.g. remata.com) that domain_name belongs to. Required if domain_name is set; the zone itself is not created here -- it must already exist with the registrar's nameservers pointed at it."
-  type        = string
-  default     = ""
+variable "activate_https" {
+  description = "Set true only after the ACM certificate shows ISSUED (i.e. after the validation CNAME from acm_validation_record has been added at the DNS provider and propagated). Creates the HTTPS listener and switches HTTP to redirect. False by default so a fresh domain_name doesn't try to serve HTTPS before the cert is actually ready."
+  type        = bool
+  default     = false
 }

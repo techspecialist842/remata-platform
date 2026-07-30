@@ -18,6 +18,10 @@ on:
         type: choice
         options: [plan, apply]
         default: plan
+      activate_https:
+        description: 'Activate HTTPS (only after the ACM cert shows ISSUED -- see acm_certificate_status output from a prior plan)'
+        type: boolean
+        default: false
 
 permissions:
   id-token: write
@@ -61,20 +65,24 @@ jobs:
         if: inputs.stack != 'bootstrap'
         env:
           CONTAINER_IMAGE: ${{ vars.CONTAINER_IMAGE_INITIAL || 'public.ecr.aws/docker/library/hello-world:latest' }}
-          ZONE: ${{ vars.ROUTE53_ZONE_NAME || '' }}
+          ROOT_DOMAIN: ${{ vars.ROOT_DOMAIN || '' }}
           STACK: ${{ inputs.stack }}
+          ACTIVATE_HTTPS: ${{ inputs.activate_https }}
         run: |
           # prod serves on the bare apex domain; dev/staging get a subdomain.
-          # Empty ZONE means no domain configured yet -- HTTPS support stays
-          # inert (domain_name empty), same as before this variable existed.
-          if [ -z "$ZONE" ]; then
+          # Empty ROOT_DOMAIN means no domain configured yet -- HTTPS support
+          # stays inert (domain_name empty), same as before this existed.
+          # DNS is managed externally (Cloudflare), not Route53 -- see
+          # modules/alb for the acm_validation_record / acm_certificate_status
+          # outputs that drive the manual DNS steps.
+          if [ -z "$ROOT_DOMAIN" ]; then
             DOMAIN=""
           elif [ "$STACK" = "prod" ]; then
-            DOMAIN="$ZONE"
+            DOMAIN="$ROOT_DOMAIN"
           else
-            DOMAIN="${STACK}.${ZONE}"
+            DOMAIN="${STACK}.${ROOT_DOMAIN}"
           fi
-          echo "flags=-var=aws_region=${{ vars.AWS_REGION }} -var=container_image=$CONTAINER_IMAGE -var=alert_email=${{ vars.ALERT_EMAIL || '' }} -var=domain_name=$DOMAIN -var=route53_zone_name=$ZONE" >> "$GITHUB_OUTPUT"
+          echo "flags=-var=aws_region=${{ vars.AWS_REGION }} -var=container_image=$CONTAINER_IMAGE -var=alert_email=${{ vars.ALERT_EMAIL || '' }} -var=domain_name=$DOMAIN -var=activate_https=$ACTIVATE_HTTPS" >> "$GITHUB_OUTPUT"
           # container_image only matters on the very first apply — the ECS
           # service's task_definition is ignore_changes'd afterward, so
           # real deploys always go through deploy.yml, never through here.
@@ -85,3 +93,11 @@ jobs:
       - name: terraform apply
         if: inputs.action == 'apply'
         run: terraform apply -input=false -auto-approve tfplan
+
+      - name: Show DNS/HTTPS outputs (environment stacks only)
+        if: inputs.action == 'apply' && inputs.stack != 'bootstrap'
+        run: |
+          echo "--- acm_validation_record (add this CNAME at Cloudflare) ---"
+          terraform output acm_validation_record
+          echo "--- acm_certificate_status ---"
+          terraform output acm_certificate_status
