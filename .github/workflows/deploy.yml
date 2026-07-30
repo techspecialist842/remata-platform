@@ -32,6 +32,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # TEMPORARY debug step — decodes the actual OIDC token GitHub issues
+      # for this job and prints its real claims, to diagnose an
+      # AssumeRoleWithWebIdentity AccessDenied that doesn't match what the
+      # trust policy expects. Remove once resolved (token itself isn't
+      # logged, only its decoded claims — safe to run).
+      - name: Debug - decode OIDC token claims
+        run: |
+          TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" | grep -o '"value":"[^"]*"' | cut -d'"' -f4)
+          PAYLOAD=$(echo "$TOKEN" | cut -d. -f2)
+          MOD=$((${#PAYLOAD} % 4))
+          if [ $MOD -eq 2 ]; then PAYLOAD="${PAYLOAD}=="; elif [ $MOD -eq 3 ]; then PAYLOAD="${PAYLOAD}="; fi
+          echo "$PAYLOAD" | tr '_-' '/+' | base64 -d | python3 -m json.tool || echo "$PAYLOAD" | tr '_-' '/+' | base64 -d
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
