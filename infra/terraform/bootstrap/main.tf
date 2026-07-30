@@ -245,11 +245,14 @@ data "aws_iam_policy_document" "github_actions_terraform" {
       "cloudwatch:*",
       "sns:*",
       "application-autoscaling:*",
+      "route53:*",
+      "acm:*",
     ]
     resources = ["*"]
     # NOTE: broad by necessity for Terraform to manage the full app stack.
     # Not IAM/organizations/billing admin. Tighten with resource-level
     # conditions once the Fase 0 resource set stabilizes (see README).
+    # route53/acm added when optional HTTPS support was activated.
   }
 
   statement {
