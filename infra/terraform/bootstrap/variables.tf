@@ -32,3 +32,9 @@ variable "github_repo" {
   description = "GitHub repository name (without org prefix). BLOCKED on client decision."
   type        = string
 }
+
+variable "root_domain" {
+  description = "Optional. Root domain to create a Route53 public hosted zone for (e.g. remata.app). Leave empty to skip -- HTTPS support stays inert until this is set and the registrar's nameservers are pointed at the resulting zone."
+  type        = string
+  default     = ""
+}

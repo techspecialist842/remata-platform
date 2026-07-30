@@ -19,3 +19,8 @@ output "github_actions_terraform_role_arn" {
   description = "Put this in the GitHub repo/environment as AWS_TERRAFORM_ROLE_ARN (protected environment only)"
   value       = aws_iam_role.github_actions_terraform.arn
 }
+
+output "route53_name_servers" {
+  description = "Point the domain registrar's nameservers at these values to activate the zone. Empty if root_domain was not set."
+  value       = length(aws_route53_zone.root) > 0 ? aws_route53_zone.root[0].name_servers : []
+}

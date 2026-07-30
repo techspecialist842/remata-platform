@@ -78,6 +78,22 @@ resource "aws_ecr_lifecycle_policy" "api" {
 }
 
 # ---------------------------------------------------------------------------
+# Root Route53 hosted zone (optional -- account-level, one zone shared by
+# dev/staging/prod's subdomains + prod's apex). Terraform only creates the
+# zone itself; the registrar's nameservers must be pointed at the resulting
+# name_servers output manually -- that handoff can't be automated from here.
+# ---------------------------------------------------------------------------
+
+resource "aws_route53_zone" "root" {
+  count = var.root_domain != "" ? 1 : 0
+  name  = var.root_domain
+
+  tags = {
+    Name = "remata-root-zone"
+  }
+}
+
+# ---------------------------------------------------------------------------
 # GitHub Actions OIDC — lets CI assume a deploy role without a long-lived
 # AWS access key stored in GitHub secrets.
 # ---------------------------------------------------------------------------
