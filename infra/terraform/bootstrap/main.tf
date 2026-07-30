@@ -273,6 +273,23 @@ data "aws_iam_policy_document" "github_actions_terraform" {
     resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/remata-*"]
   }
 
+  # Needed once per AWS account/region: RDS auto-creates a service-linked
+  # role (AWSServiceRoleForRDS) on the very first DB instance. Without this,
+  # CreateDBInstance fails with a generic "verify permission to create
+  # service linked role" error that doesn't name the missing action.
+  statement {
+    sid       = "RDSServiceLinkedRole"
+    effect    = "Allow"
+    actions   = ["iam:CreateServiceLinkedRole"]
+    resources = ["arn:aws:iam::*:role/aws-service-role/rds.amazonaws.com/AWSServiceRoleForRDS*"]
+
+    condition {
+      test     = "StringLike"
+      variable = "iam:AWSServiceName"
+      values   = ["rds.amazonaws.com"]
+    }
+  }
+
   statement {
     sid    = "TerraformStateAccess"
     effect = "Allow"
