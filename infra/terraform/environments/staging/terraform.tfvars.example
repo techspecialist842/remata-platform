@@ -1,5 +1,7 @@
 # Copy to terraform.tfvars and fill in. Do not commit terraform.tfvars.
 
-aws_region      = "us-east-1" # BLOCKED: must match bootstrap's region — pending client decision
-container_image = ""          # BLOCKED: <ecr_repo_url>:staging-<sha>, only exists after first CI image push
-alert_email     = ""          # BLOCKED: pending ops stakeholder
+aws_region        = "us-east-2"
+container_image   = "" # <ecr_repo_url>:staging-<sha>, from ECR after a CI image push
+alert_email       = "" # pending ops stakeholder
+domain_name       = "" # optional, e.g. staging.remata.com -- leave empty for HTTP-only
+route53_zone_name = "" # required if domain_name is set, e.g. remata.com

@@ -23,3 +23,15 @@ variable "alert_email" {
   type        = string
   default     = ""
 }
+
+variable "domain_name" {
+  description = "Optional. e.g. staging.remata.com. Leave empty to stay HTTP-only."
+  type        = string
+  default     = ""
+}
+
+variable "route53_zone_name" {
+  description = "Optional. Existing Route53 zone (e.g. remata.com) that domain_name belongs to. Required if domain_name is set."
+  type        = string
+  default     = ""
+}

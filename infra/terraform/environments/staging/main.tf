@@ -30,6 +30,8 @@ module "alb" {
   vpc_id            = module.network.vpc_id
   public_subnet_ids = module.network.public_subnet_ids
   security_group_id = module.security_groups.alb_sg_id
+  domain_name       = var.domain_name
+  route53_zone_name = var.route53_zone_name
 }
 
 module "ecs_service" {

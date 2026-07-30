@@ -1,3 +1,5 @@
-aws_region      = "us-east-1" # BLOCKED: pending client decision
-container_image = ""          # BLOCKED: only exists after first CI image push
-alert_email     = ""
+aws_region        = "us-east-2"
+container_image   = "" # <ecr_repo_url>:dev-<sha>, from ECR after a CI image push
+alert_email       = ""
+domain_name       = "" # optional, e.g. dev.remata.com -- leave empty for HTTP-only
+route53_zone_name = "" # required if domain_name is set, e.g. remata.com
