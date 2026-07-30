@@ -21,9 +21,12 @@ variable "allocated_storage" {
 }
 
 variable "engine_version" {
-  description = "PostgreSQL major.minor version."
+  # Major version only (not X.Y) so RDS resolves to whatever minor version
+  # it currently supports -- a pinned X.Y previously failed apply outright
+  # once that specific minor was no longer offered.
+  description = "PostgreSQL major version."
   type        = string
-  default     = "16.4"
+  default     = "16"
 }
 
 variable "db_name" {
