@@ -61,8 +61,20 @@ jobs:
         if: inputs.stack != 'bootstrap'
         env:
           CONTAINER_IMAGE: ${{ vars.CONTAINER_IMAGE_INITIAL || 'public.ecr.aws/docker/library/hello-world:latest' }}
+          ZONE: ${{ vars.ROUTE53_ZONE_NAME || '' }}
+          STACK: ${{ inputs.stack }}
         run: |
-          echo "flags=-var=aws_region=${{ vars.AWS_REGION }} -var=container_image=$CONTAINER_IMAGE -var=alert_email=${{ vars.ALERT_EMAIL || '' }}" >> "$GITHUB_OUTPUT"
+          # prod serves on the bare apex domain; dev/staging get a subdomain.
+          # Empty ZONE means no domain configured yet -- HTTPS support stays
+          # inert (domain_name empty), same as before this variable existed.
+          if [ -z "$ZONE" ]; then
+            DOMAIN=""
+          elif [ "$STACK" = "prod" ]; then
+            DOMAIN="$ZONE"
+          else
+            DOMAIN="${STACK}.${ZONE}"
+          fi
+          echo "flags=-var=aws_region=${{ vars.AWS_REGION }} -var=container_image=$CONTAINER_IMAGE -var=alert_email=${{ vars.ALERT_EMAIL || '' }} -var=domain_name=$DOMAIN -var=route53_zone_name=$ZONE" >> "$GITHUB_OUTPUT"
           # container_image only matters on the very first apply — the ECS
           # service's task_definition is ignore_changes'd afterward, so
           # real deploys always go through deploy.yml, never through here.
