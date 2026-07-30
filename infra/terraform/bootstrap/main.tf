@@ -267,6 +267,8 @@ data "aws_iam_policy_document" "github_actions_terraform" {
       "iam:TagRole",
       "iam:PassRole",
       "iam:ListInstanceProfilesForRole",
+      "iam:ListRolePolicies",
+      "iam:ListAttachedRolePolicies",
     ]
     resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/remata-*"]
   }

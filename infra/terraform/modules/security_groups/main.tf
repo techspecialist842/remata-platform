@@ -1,6 +1,6 @@
 resource "aws_security_group" "alb" {
   name        = "remata-${var.environment}-alb"
-  description = "ALB — public HTTP/HTTPS ingress"
+  description = "ALB - public HTTP/HTTPS ingress"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -38,7 +38,7 @@ resource "aws_security_group" "alb" {
 
 resource "aws_security_group" "ecs_service" {
   name        = "remata-${var.environment}-ecs-service"
-  description = "ECS Fargate tasks — ingress only from the ALB"
+  description = "ECS Fargate tasks - ingress only from the ALB"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -64,7 +64,7 @@ resource "aws_security_group" "ecs_service" {
 
 resource "aws_security_group" "database" {
   name        = "remata-${var.environment}-database"
-  description = "RDS Postgres — ingress only from ECS tasks"
+  description = "RDS Postgres - ingress only from ECS tasks"
   vpc_id      = var.vpc_id
 
   ingress {
