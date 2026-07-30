@@ -42,6 +42,13 @@ module "ecs_service" {
   container_image    = var.container_image
   desired_count      = var.desired_count
   db_secret_arn      = module.database.secret_arn
+
+  # module.database.secret_arn only points at the secret container, not its
+  # version (the actual credential JSON) -- without this, ECS can start
+  # placing tasks before the secret version finishes writing, and fail with
+  # "can't find the specified secret value for staging label: AWSCURRENT".
+  # Observed on remata-dev's first-ever apply.
+  depends_on = [module.database]
 }
 
 module "observability" {
