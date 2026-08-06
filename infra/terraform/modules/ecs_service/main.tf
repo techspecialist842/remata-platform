@@ -40,11 +40,33 @@ resource "aws_iam_role_policy_attachment" "execution_managed" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+resource "random_password" "jwt_access_secret" {
+  length  = 64
+  special = false
+}
+
+resource "random_password" "jwt_enrollment_secret" {
+  length  = 64
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "jwt" {
+  name = "remata/${var.environment}/jwt"
+}
+
+resource "aws_secretsmanager_secret_version" "jwt" {
+  secret_id = aws_secretsmanager_secret.jwt.id
+  secret_string = jsonencode({
+    access_secret     = random_password.jwt_access_secret.result
+    enrollment_secret = random_password.jwt_enrollment_secret.result
+  })
+}
+
 data "aws_iam_policy_document" "execution_secrets" {
   statement {
     effect    = "Allow"
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = [var.db_secret_arn]
+    resources = [var.db_secret_arn, aws_secretsmanager_secret.jwt.arn]
   }
 }
 
@@ -84,9 +106,13 @@ resource "aws_ecs_task_definition" "api" {
       environment = [
         { name = "NODE_ENV", value = var.environment == "prod" ? "production" : var.environment },
         { name = "PORT", value = tostring(var.container_port) },
+        { name = "DB_SSL", value = "true" },
+        { name = "FRAUD_POLICY", value = var.fraud_policy },
       ]
       secrets = [
         { name = "DATABASE_URL", valueFrom = "${var.db_secret_arn}:url::" },
+        { name = "JWT_ACCESS_SECRET", valueFrom = "${aws_secretsmanager_secret.jwt.arn}:access_secret::" },
+        { name = "JWT_ENROLLMENT_SECRET", valueFrom = "${aws_secretsmanager_secret.jwt.arn}:enrollment_secret::" },
       ]
       logConfiguration = {
         logDriver = "awslogs"

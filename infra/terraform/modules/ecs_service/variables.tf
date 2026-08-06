@@ -49,3 +49,9 @@ variable "log_retention_days" {
   type    = number
   default = 30
 }
+
+variable "fraud_policy" {
+  description = "fail-open (allow through) or fail-closed (deny) when the fraud scoring engine itself errors."
+  type        = string
+  default     = "fail-open"
+}
