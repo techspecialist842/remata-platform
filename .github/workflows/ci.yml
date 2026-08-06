@@ -12,6 +12,29 @@ jobs:
     defaults:
       run:
         working-directory: apps/api
+    # Real Postgres, not mocks: the e2e suite exercises actual migrations and
+    # actual role-based access, which is the point of the Fase 1 acceptance
+    # criteria ("cubiertas por pruebas automatizadas de humo/contrato en CI").
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: remata
+          POSTGRES_PASSWORD: remata
+          POSTGRES_DB: remata
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U remata"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://remata:remata@localhost:5432/remata
+      DB_SSL: 'false'
+      JWT_ACCESS_SECRET: ci-access-secret-not-for-prod
+      JWT_ENROLLMENT_SECRET: ci-enrollment-secret-not-for-prod
+      FRAUD_POLICY: fail-open
     steps:
       - uses: actions/checkout@v4
 
@@ -25,6 +48,8 @@ jobs:
       - run: npm run lint
       - run: npm run test -- --ci
       - run: npm run build
+      - run: npm run migration:run
+      - run: npm run test:e2e -- --ci
 
       - name: Build Docker image (no push — validates the Dockerfile only)
         run: docker build -t remata-api:ci .
