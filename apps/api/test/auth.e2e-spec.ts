@@ -146,6 +146,25 @@ describe('Auth + Admin (e2e)', () => {
     expect(withHeader.headers['x-correlation-id']).toBe('e2e-fixed-trace-id');
   });
 
+  // Regression guard against a timing side-channel: rejecting an unknown email
+  // must still pay bcrypt's cost, otherwise "unknown email" returns in ~20ms
+  // while "wrong password" takes ~250ms, and that gap enumerates registered
+  // accounts regardless of the generic error message.
+  //
+  // Asserted as an absolute floor rather than a comparison between two runs, so
+  // the test does not go flaky on a noisy CI runner. bcrypt at cost 12 takes
+  // ~200ms; a regression here would drop it below 20ms.
+  it('spends bcrypt time even when the email does not exist', async () => {
+    const startedAt = Date.now();
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: `absent-${runId}@nowhere.test`, password: 'password123' })
+      .expect(401);
+    const elapsed = Date.now() - startedAt;
+
+    expect(elapsed).toBeGreaterThan(100);
+  });
+
   // Regression guard: malformed JSON throws inside the body parser, so the
   // correlation middleware has to run BEFORE it (see main.ts) or this class of
   // error comes back untraceable.

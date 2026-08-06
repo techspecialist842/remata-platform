@@ -30,6 +30,14 @@ const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL_DAYS = 30;
 const BCRYPT_ROUNDS = 12;
 
+// bcrypt hash of a random throwaway string, at the same cost factor as real
+// passwords. Compared against when no account matches, so that "unknown email"
+// and "wrong password" take the same time. Without this, bcrypt's ~250ms only
+// runs on the existing-account path, and the ~15x timing gap lets an attacker
+// enumerate registered emails despite the deliberately generic error message.
+const TIMING_EQUALIZER_HASH =
+  '$2b$12$bDpcw.fXJonMhuUku.cnoOLdfHcRSbOOtVcEF9yiIcdBncC3tMPXu';
+
 export interface RequestContext {
   ip?: string;
   userAgent?: string;
@@ -163,11 +171,15 @@ export class AuthService {
       },
     });
     const genericError = new UnauthorizedException('Invalid credentials');
-    if (!user || !user.isActive) {
-      throw genericError;
-    }
-    const passwordOk = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!passwordOk) {
+
+    // Always run the comparison, even with no matching account, so every
+    // rejection costs the same wall-clock time (see TIMING_EQUALIZER_HASH).
+    // Evaluate the result only after, and never short-circuit before it.
+    const passwordOk = await bcrypt.compare(
+      dto.password,
+      user?.passwordHash ?? TIMING_EQUALIZER_HASH,
+    );
+    if (!user || !user.isActive || !passwordOk) {
       throw genericError;
     }
 
