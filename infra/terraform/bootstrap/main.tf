@@ -190,6 +190,10 @@ data "aws_iam_policy_document" "github_actions_deploy" {
       "ecs:RegisterTaskDefinition",
       "ecs:ListTasks",
       "ecs:DescribeTasks",
+      # RunTask/StopTask: used to run the one-off "npm run migration:run:prod"
+      # task before cutting the service over to the new task definition.
+      "ecs:RunTask",
+      "ecs:StopTask",
     ]
     resources = ["*"]
   }
@@ -199,6 +203,18 @@ data "aws_iam_policy_document" "github_actions_deploy" {
     effect    = "Allow"
     actions   = ["iam:PassRole"]
     resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/remata-*"]
+  }
+
+  statement {
+    # Read-only: lets a failed migration run surface its actual error in the
+    # GitHub Actions log instead of just "exited with code 1".
+    sid    = "ReadDeployLogs"
+    effect = "Allow"
+    actions = [
+      "logs:GetLogEvents",
+      "logs:FilterLogEvents",
+    ]
+    resources = ["arn:aws:logs:*:${data.aws_caller_identity.current.account_id}:log-group:/ecs/remata-*"]
   }
 
   statement {

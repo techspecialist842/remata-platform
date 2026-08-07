@@ -4,6 +4,9 @@ dist/
 coverage/
 *.log
 npm-debug.log*
+.env
+.env.*
+!.env.example
 
 # Terraform
 **/.terraform/
@@ -15,8 +18,17 @@ npm-debug.log*
 tfplan*
 **/terraform.tfvars
 **/backend.hcl
-**/fix-*.ps1
-**/create-*.ps1
+# One-off operational scripts: these set AWS credentials as environment
+# variables in plaintext, so they must never reach this repository (which is
+# public). Keep the wildcard broad rather than naming individual scripts.
+**/*.ps1
+
+# Client business documents — confidential, and this repository is public.
+# They are kept locally and shared with the client directly, never committed.
+# (See the client instruction on remata-docs: nothing is uploaded without
+# explicit approval.)
+*.docx
+*.pdf
 
 # OS / editor
 .DS_Store

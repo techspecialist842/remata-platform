@@ -83,9 +83,65 @@ jobs:
           container-name: api
           image: ${{ needs.build-and-push.outputs.image }}
 
-      - uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-        with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: remata-${{ inputs.environment || 'staging' }}-api
-          cluster: remata-${{ inputs.environment || 'staging' }}
-          wait-for-service-stability: true
+      - name: Register new task definition revision
+        id: register
+        env:
+          TASK_DEF_FILE: ${{ steps.task-def.outputs.task-definition }}
+        run: |
+          set -euo pipefail
+          ARN=$(aws ecs register-task-definition \
+            --cli-input-json "file://$TASK_DEF_FILE" \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "task_def_arn=$ARN" >> "$GITHUB_OUTPUT"
+
+      # Runs `npm run migration:run:prod` once, using the NEW image, before any
+      # live traffic reaches it — a broken migration fails the deploy here
+      # instead of surfacing as a runtime error against the running service.
+      - name: Run database migrations
+        env:
+          ENVIRONMENT: ${{ inputs.environment || 'staging' }}
+          CLUSTER: remata-${{ inputs.environment || 'staging' }}
+          SERVICE: remata-${{ inputs.environment || 'staging' }}-api
+          TASK_DEF_ARN: ${{ steps.register.outputs.task_def_arn }}
+        run: |
+          set -euo pipefail
+          NETWORK_CONFIG=$(aws ecs describe-services \
+            --cluster "$CLUSTER" --services "$SERVICE" \
+            --query 'services[0].networkConfiguration' --output json)
+
+          TASK_ARN=$(aws ecs run-task \
+            --cluster "$CLUSTER" \
+            --task-definition "$TASK_DEF_ARN" \
+            --launch-type FARGATE \
+            --network-configuration "$NETWORK_CONFIG" \
+            --overrides '{"containerOverrides":[{"name":"api","command":["npm","run","migration:run:prod"]}]}' \
+            --query 'tasks[0].taskArn' --output text)
+          echo "Migration task: $TASK_ARN"
+
+          aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$TASK_ARN"
+
+          EXIT_CODE=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK_ARN" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+          TASK_ID="${TASK_ARN##*/}"
+
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "::error::Migration task exited with code '$EXIT_CODE' (or crashed before exiting). Log stream: api/api/$TASK_ID"
+            aws logs filter-log-events \
+              --log-group-name "/ecs/remata-${ENVIRONMENT}-api" \
+              --log-stream-names "api/api/$TASK_ID" \
+              --query 'events[].message' --output text || true
+            exit 1
+          fi
+          echo "Migrations applied successfully."
+
+      - name: Update service to the new task definition
+        env:
+          CLUSTER: remata-${{ inputs.environment || 'staging' }}
+          SERVICE: remata-${{ inputs.environment || 'staging' }}-api
+          TASK_DEF_ARN: ${{ steps.register.outputs.task_def_arn }}
+        run: |
+          set -euo pipefail
+          aws ecs update-service \
+            --cluster "$CLUSTER" --service "$SERVICE" \
+            --task-definition "$TASK_DEF_ARN" --force-new-deployment
+          aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"
