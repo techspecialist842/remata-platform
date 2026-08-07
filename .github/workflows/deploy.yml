@@ -50,9 +50,33 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           set -euo pipefail
-          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:${ENVIRONMENT}-${IMAGE_TAG}"
-          docker build -t "$IMAGE_URI" .
-          docker push "$IMAGE_URI"
+          TAG="${ENVIRONMENT}-${IMAGE_TAG}"
+          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$TAG"
+
+          # ECR tags are immutable, and this tag is derived from the commit SHA,
+          # so an existing tag is by definition already the right image for this
+          # commit. Reuse it rather than pushing again.
+          #
+          # Without this, any deploy that fails AFTER the push — a bad migration,
+          # an unstable service — can never be re-run: the retry dies on "tag
+          # already exists" before reaching the step that actually failed. That
+          # is precisely when you least want the pipeline to be unusable.
+          #
+          # Uses batch-get-image (not describe-images) because the deploy role is
+          # already granted ecr:BatchGetImage; describe-images would need a new
+          # IAM permission for no added benefit.
+          FOUND=$(aws ecr batch-get-image \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag="$TAG" \
+            --query 'length(images)' --output text 2>/dev/null || echo 0)
+
+          if [ "$FOUND" != "0" ]; then
+            echo "Image for this commit already in ECR — reusing it: $IMAGE_URI"
+          else
+            docker build -t "$IMAGE_URI" .
+            docker push "$IMAGE_URI"
+          fi
+
           echo "image=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
   deploy:
