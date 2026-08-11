@@ -32,17 +32,16 @@ export class Notification {
   id: string;
 
   @Index()
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
   @Column({ type: 'enum', enum: NotificationChannelType })
   channel: NotificationChannelType;
 
-  @Column({
-    type: 'enum',
-    enum: NotificationPriority,
-    default: NotificationPriority.NORMAL,
-  })
+  // smallint, not a Postgres enum: NotificationPriority is numeric, and the
+  // column is ordered by (status, priority DESC) when draining the queue —
+  // an enum type would not sort by severity.
+  @Column({ type: 'smallint', default: NotificationPriority.NORMAL })
   priority: NotificationPriority;
 
   @Column({ name: 'template_key' })

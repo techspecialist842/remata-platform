@@ -7,6 +7,8 @@ import { DatabaseModule } from './database/database.module';
 import { CommonModule } from './common/common.module';
 import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
+import { CatalogoModule } from './catalogo/catalogo.module';
+import { OrdenesModule } from './ordenes/ordenes.module';
 
 // The correlation-id middleware is deliberately NOT registered here — it is
 // applied in main.ts via app.use() so it runs before the body parser. See the
@@ -19,6 +21,8 @@ import { AdminModule } from './admin/admin.module';
     HealthModule,
     AuthModule,
     AdminModule,
+    CatalogoModule,
+    OrdenesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

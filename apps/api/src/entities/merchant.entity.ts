@@ -20,7 +20,7 @@ export class Merchant {
   user: User;
 
   @Index({ unique: true })
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
   @Column({ name: 'legal_name' })

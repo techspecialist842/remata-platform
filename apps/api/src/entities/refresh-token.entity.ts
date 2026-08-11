@@ -19,7 +19,7 @@ export class RefreshToken {
   user: User;
 
   @Index()
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
   // SHA-256 hash of the refresh token — the raw token is never persisted.
