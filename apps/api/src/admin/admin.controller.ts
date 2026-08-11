@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -23,6 +24,9 @@ import { CreateAdminDto } from './dto/create-admin.dto';
 import { Idempotent } from '../common/decorators/idempotent.decorator';
 import { ApiErrorResponses } from '../common/decorators/api-error-responses.decorator';
 import { SetUserActiveDto } from './dto/set-user-active.dto';
+import { RetirarRescateDto } from './dto/moderar-rescate.dto';
+import { ModeracionService } from './moderacion.service';
+import { OrdenStatus, RescateStatus } from '../common/enums/marketplace.enum';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -31,7 +35,10 @@ import { SetUserActiveDto } from './dto/set-user-active.dto';
 @ApiErrorResponses(401, 403)
 @Controller({ path: 'admin', version: '1' })
 export class AdminController {
-  constructor(private readonly admin: AdminService) {}
+  constructor(
+    private readonly admin: AdminService,
+    private readonly moderacion: ModeracionService,
+  ) {}
 
   @Post('admins')
   @Idempotent()
@@ -64,5 +71,55 @@ export class AdminController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.admin.setUserActive(id, dto.isActive, user.userId);
+  }
+
+  // --- Moderación del marketplace (Fase 2) ---
+
+  @Get('rescates')
+  @ApiOperation({
+    summary: 'Listar rescates de toda la plataforma',
+    description: 'Cualquier estado y cualquier comercio. Filtrable por estado.',
+  })
+  @ApiErrorResponses(400)
+  listarRescates(
+    @Query() query: PaginationQueryDto,
+    @Query('status') status?: RescateStatus,
+  ) {
+    return this.moderacion.listarRescates(status, query.page, query.pageSize);
+  }
+
+  @Patch('rescates/:id/retirar')
+  @ApiOperation({
+    summary: 'Retirar un rescate del marketplace',
+    description:
+      'Estado terminal: el comercio no puede republicarlo, debe crear uno nuevo. El motivo queda registrado y se le muestra.',
+  })
+  @ApiErrorResponses(400, 404)
+  retirarRescate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RetirarRescateDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.moderacion.retirar(user.userId, id, dto.motivo);
+  }
+
+  @Get('ordenes')
+  @ApiOperation({
+    summary: 'Listar órdenes de toda la plataforma',
+    description: 'Para soporte y resolución de incidencias.',
+  })
+  @ApiErrorResponses(400)
+  listarOrdenes(
+    @Query() query: PaginationQueryDto,
+    @Query('status') status?: OrdenStatus,
+  ) {
+    return this.moderacion.listarOrdenes(status, query.page, query.pageSize);
+  }
+
+  @Get('ordenes/:id')
+  @ApiOperation({ summary: 'Ver una orden' })
+  @ApiErrorResponses(400, 404)
+  verOrden(@Param('id', ParseUUIDPipe) id: string) {
+    return this.moderacion.verOrden(id);
   }
 }
