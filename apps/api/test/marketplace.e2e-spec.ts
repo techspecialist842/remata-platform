@@ -280,6 +280,44 @@ describe('Marketplace (e2e)', () => {
       .expect(400);
   });
 
+  // Sin las líneas, una orden es un número y un importe: el comercio no sabe
+  // qué preparar y quien compró no reconoce su propia reserva.
+  it('ambos listados de órdenes dicen qué se compró', async () => {
+    const rescateId = await publicarRescate(4, 1200, 'lineas');
+    await http()
+      .post('/api/v1/ordenes')
+      .set('Authorization', `Bearer ${compradorToken}`)
+      .set('Idempotency-Key', key('orden-lineas'))
+      .send({ rescateId, cantidad: 2 })
+      .expect(201);
+
+    const titulo = `Rescate lineas ${runId}`;
+    const lineaDe = (cuerpo: unknown) =>
+      (cuerpo as { items: { items: { tituloSnapshot: string }[] }[] }).items
+        .flatMap((o) => o.items)
+        .find((l) => l.tituloSnapshot === titulo);
+
+    const mias = await http()
+      .get('/api/v1/ordenes/mias')
+      .set('Authorization', `Bearer ${compradorToken}`)
+      .expect(200);
+    expect(lineaDe(mias.body)).toBeDefined();
+
+    const recibidas = await http()
+      .get('/api/v1/ordenes/recibidas')
+      .set('Authorization', `Bearer ${comercioToken}`)
+      .expect(200);
+    const linea = lineaDe(recibidas.body) as unknown as {
+      cantidad: number;
+      precioUnitarioCentavos: number;
+    };
+    expect(linea).toBeDefined();
+    expect(linea.cantidad).toBe(2);
+    // Copia tomada en la compra: el precio de la línea no sigue al de la
+    // publicación si esta cambia después.
+    expect(linea.precioUnitarioCentavos).toBe(1200);
+  });
+
   it('impide que un comprador publique rescates (control de rol)', async () => {
     await http()
       .post('/api/v1/catalogo/rescates')

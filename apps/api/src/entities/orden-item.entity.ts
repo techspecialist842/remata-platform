@@ -22,7 +22,7 @@ export class OrdenItem {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => Orden, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Orden, (orden) => orden.items, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'orden_id' })
   orden: Orden;
 
