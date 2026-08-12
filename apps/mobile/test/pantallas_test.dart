@@ -81,7 +81,7 @@ void main() {
       expect(find.text('Pan artesanal'), findsOneWidget);
       expect(find.text('Croissants'), findsOneWidget);
 
-      // Importe formateado como balboas, desde centavos enteros.
+      // La moneda la manda el servidor (PAB en estos datos) y la pantalla la sigue.
       expect(find.text('B/. 3.60'), findsOneWidget);
       expect(find.text('B/. 2.25'), findsOneWidget);
 

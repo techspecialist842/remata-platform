@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../datos/modelos.dart' show monedaPorDefecto;
 
 /// Design tokens — the single place where the visual language is defined.
 ///
@@ -102,9 +103,17 @@ class RTokens {
 /// Money formatting, centralised so no screen invents its own.
 ///
 /// Amounts travel as integer minor units end to end — never as decimals — so
-/// rounding cannot drift between client and server. Panama's currency is the
-/// balboa, displayed `B/.` and pegged 1:1 to the US dollar.
-String formatearPrecio(int centavos, {String moneda = 'PAB'}) {
-  final simbolo = moneda == 'PAB' ? 'B/.' : '\$';
+/// rounding cannot drift between client and server.
+///
+/// The currency always comes from the server, which stores it per record; the
+/// fallback lives in the domain layer (see [monedaPorDefecto]).
+String formatearPrecio(int centavos, {String moneda = monedaPorDefecto}) {
+  final simbolo = simboloDe(moneda);
   return '$simbolo ${(centavos / 100).toStringAsFixed(2)}';
 }
+
+String simboloDe(String moneda) => switch (moneda) {
+      'PAB' => 'B/.',
+      'USD' => '\$',
+      _ => moneda, // Una moneda que no conocemos se nombra, no se disfraza.
+    };

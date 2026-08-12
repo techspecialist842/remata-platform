@@ -36,17 +36,40 @@ class ApiCliente {
 
   String? _accessToken;
   String? _refreshToken;
+  String? _rol;
 
   bool get autenticado => _accessToken != null;
+
+  /// Rol de la sesión, leído del propio token.
+  ///
+  /// Sirve para decidir qué pantalla mostrar, nada más. No es una frontera de
+  /// seguridad: el servidor vuelve a comprobar el rol en cada petición, así que
+  /// un cliente que se mintiera a sí mismo solo cosecharía 403.
+  String? get rol => _rol;
 
   void establecerSesion(String accessToken, String refreshToken) {
     _accessToken = accessToken;
     _refreshToken = refreshToken;
+    _rol = _rolDe(accessToken);
   }
 
   void cerrarSesion() {
     _accessToken = null;
     _refreshToken = null;
+    _rol = null;
+  }
+
+  static String? _rolDe(String accessToken) {
+    try {
+      final partes = accessToken.split('.');
+      if (partes.length != 3) return null;
+      final carga = utf8.decode(base64Url.decode(base64Url.normalize(partes[1])));
+      return (jsonDecode(carga) as Map<String, dynamic>)['role'] as String?;
+    } catch (_) {
+      // Un token con forma inesperada no debe impedir usar la app: sin rol
+      // conocido se muestra la experiencia de comprador, que es la común.
+      return null;
+    }
   }
 
   Map<String, String> _cabeceras({String? idempotencyKey}) {

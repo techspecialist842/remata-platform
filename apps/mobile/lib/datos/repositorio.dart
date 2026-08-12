@@ -21,6 +21,7 @@ class Repositorio {
     required String email,
     required String password,
     String? nombre,
+    bool comercio = false,
   }) async {
     final r = await api.post(
       '/api/v1/auth/register',
@@ -29,6 +30,8 @@ class Repositorio {
         'email': email,
         'password': password,
         if (nombre != null && nombre.isNotEmpty) 'displayName': nombre,
+        // Registrarse como comercio da de alta también su ficha comercial.
+        if (comercio) 'role': 'comercio',
       },
     ) as Map<String, dynamic>;
     api.establecerSesion(
@@ -60,6 +63,8 @@ class Repositorio {
   }
 
   void cerrarSesion() => api.cerrarSesion();
+
+  bool get esComercio => api.rol == 'comercio';
 
   // --- Catálogo ---
 
@@ -111,8 +116,75 @@ class Repositorio {
     return Pagina.desdeJson(r, Orden.desdeJson);
   }
 
-  Future<void> cancelarOrden(String id) async {
-    await api.patch('/api/v1/ordenes/$id/cancelar',
-        cuerpo: {'motivo': 'comprador'});
+  /// [motivo] lo decide quien cancela: el comprador solo puede alegar
+  /// 'comprador'; el comercio, 'comercio' o 'no_show'. El servidor lo verifica.
+  Future<void> cancelarOrden(String id, {String motivo = 'comprador'}) async {
+    await api.patch('/api/v1/ordenes/$id/cancelar', cuerpo: {'motivo': motivo});
   }
+
+  // --- Comercio ---
+
+  Future<Pagina<Rescate>> misRescates({int pagina = 1}) async {
+    final r = await api.get('/api/v1/catalogo/mis-rescates', query: {
+      'page': '$pagina',
+      'pageSize': '20',
+    }) as Map<String, dynamic>;
+    return Pagina.desdeJson(r, Rescate.desdeJson);
+  }
+
+  /// Nace en borrador: publicarlo es una acción aparte y deliberada, para que
+  /// nada salga a la vitrina por el mero hecho de haberlo escrito.
+  Future<Rescate> crearRescate({
+    required String titulo,
+    String? descripcion,
+    String? categoria,
+    required int precioCentavos,
+    int? precioOriginalCentavos,
+    required int cantidadTotal,
+    required DateTime validoDesde,
+    required DateTime validoHasta,
+  }) async {
+    final r = await api.post(
+      '/api/v1/catalogo/rescates',
+      idempotencyKey: _clave('resc'),
+      cuerpo: {
+        'titulo': titulo,
+        if (descripcion != null && descripcion.isNotEmpty)
+          'descripcion': descripcion,
+        if (categoria != null && categoria.isNotEmpty) 'categoria': categoria,
+        'precioCentavos': precioCentavos,
+        // Omitido si no hay precio de referencia: enviar null sería afirmar
+        // que no lo tiene, y el campo es opcional.
+        'precioOriginalCentavos': ?precioOriginalCentavos,
+        'cantidadTotal': cantidadTotal,
+        'validoDesde': validoDesde.toUtc().toIso8601String(),
+        'validoHasta': validoHasta.toUtc().toIso8601String(),
+      },
+    ) as Map<String, dynamic>;
+    return Rescate.desdeJson(r);
+  }
+
+  Future<void> publicarRescate(String id) =>
+      api.patch('/api/v1/catalogo/rescates/$id/publicar');
+
+  Future<void> pausarRescate(String id) =>
+      api.patch('/api/v1/catalogo/rescates/$id/pausar');
+
+  Future<Pagina<Orden>> ordenesRecibidas({int pagina = 1}) async {
+    final r = await api.get('/api/v1/ordenes/recibidas', query: {
+      'page': '$pagina',
+      'pageSize': '20',
+    }) as Map<String, dynamic>;
+    return Pagina.desdeJson(r, Orden.desdeJson);
+  }
+
+  Future<void> confirmarOrden(String id) =>
+      api.patch('/api/v1/ordenes/$id/confirmar');
+
+  Future<void> cumplirOrden(String id) =>
+      api.patch('/api/v1/ordenes/$id/cumplir');
+
+  // La reputación del propio comercio no se muestra todavía: la API la indexa
+  // por merchantId, y al iniciar sesión la app solo recibe el userId. Hace
+  // falta un endpoint de «mi comercio» antes de poder pedirla con fiabilidad.
 }

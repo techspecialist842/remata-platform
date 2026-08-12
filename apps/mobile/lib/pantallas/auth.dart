@@ -26,6 +26,7 @@ class _PantallaAuthState extends State<PantallaAuth> {
   final _nombre = TextEditingController();
 
   bool _registrando = false;
+  bool _comercio = false;
   bool _cargando = false;
   String? _error;
 
@@ -50,6 +51,7 @@ class _PantallaAuthState extends State<PantallaAuth> {
           email: _email.text.trim(),
           password: _password.text,
           nombre: _nombre.text.trim(),
+          comercio: _comercio,
         );
       } else {
         final entro = await widget.repo.iniciarSesion(
@@ -105,7 +107,9 @@ class _PantallaAuthState extends State<PantallaAuth> {
                     const SizedBox(height: RTokens.s2),
                     Text(
                       _registrando
-                          ? 'Empezá a ahorrar y a evitar desperdicio.'
+                          ? (_comercio
+                              ? 'Vendé lo que te sobra antes de que se pierda.'
+                              : 'Empezá a ahorrar y a evitar desperdicio.')
                           : 'Ingresá para ver las ofertas cerca tuyo.',
                       style: RTokens.body,
                       textAlign: TextAlign.center,
@@ -113,13 +117,45 @@ class _PantallaAuthState extends State<PantallaAuth> {
                     const SizedBox(height: RTokens.s6),
 
                     if (_registrando) ...[
+                      // El tipo de cuenta se elige una sola vez y no se puede
+                      // cambiar después, así que se pregunta antes de nada.
+                      SegmentedButton<bool>(
+                        segments: const [
+                          ButtonSegment(
+                            value: false,
+                            icon: Icon(Icons.shopping_bag_outlined, size: 18),
+                            label: Text('Quiero comprar'),
+                          ),
+                          ButtonSegment(
+                            value: true,
+                            icon: Icon(Icons.storefront_outlined, size: 18),
+                            label: Text('Tengo un comercio'),
+                          ),
+                        ],
+                        selected: {_comercio},
+                        onSelectionChanged: (s) =>
+                            setState(() => _comercio = s.first),
+                      ),
+                      const SizedBox(height: RTokens.s4),
                       TextFormField(
                         controller: _nombre,
                         textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          hintText: 'Tu nombre',
-                          prefixIcon: Icon(Icons.person_outline),
+                        decoration: InputDecoration(
+                          hintText: _comercio
+                              ? 'Nombre de tu comercio'
+                              : 'Tu nombre',
+                          prefixIcon: Icon(_comercio
+                              ? Icons.storefront_outlined
+                              : Icons.person_outline),
                         ),
+                        validator: (v) {
+                          // Para un comercio el nombre no es decorativo: pasa a
+                          // ser su razón social en el alta.
+                          if (_comercio && (v?.trim().isEmpty ?? true)) {
+                            return 'Poné el nombre de tu comercio';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: RTokens.s3),
                     ],

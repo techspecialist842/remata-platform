@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'tokens.dart';
+import '../datos/modelos.dart' show monedaPorDefecto;
 
 /// Reusable pieces assembled from tokens. Screens compose these instead of
 /// styling widgets inline, so the pending visual redesign lands here and in
@@ -68,7 +69,7 @@ class Precio extends StatelessWidget {
     super.key,
     required this.centavos,
     this.originalCentavos,
-    this.moneda = 'PAB',
+    this.moneda = monedaPorDefecto,
   });
 
   final int centavos;

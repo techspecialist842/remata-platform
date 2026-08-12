@@ -1,8 +1,17 @@
-﻿# REMATA — aplicación del comprador
+﻿# REMATA — aplicación móvil
 
-Cliente Flutter del marketplace. Cubre el recorrido completo de compra:
-registro e inicio de sesión, búsqueda en el catálogo, detalle de una oferta,
-reserva con cupón opcional y seguimiento de los pedidos.
+Cliente Flutter del marketplace. Son dos aplicaciones dentro del mismo binario,
+porque comprador y comercio no comparten ni tareas ni pantallas:
+
+- **Comprador** — registro e inicio de sesión, búsqueda en el catálogo, detalle
+  de una oferta, reserva con cupón opcional y seguimiento de los pedidos.
+- **Comercio** — alta de publicaciones, publicar y pausar, y las órdenes
+  recibidas con su ciclo completo: confirmar, entregar, rechazar o marcar que
+  el comprador no se presentó.
+
+Cuál se muestra lo decide el rol que viene en el token de la sesión. Eso sirve
+para elegir pantalla, no como control de acceso: el servidor revalida el rol en
+cada petición, así que un cliente que se mintiera solo cosecharía 403.
 
 Habla contra la API de Fase 2 (`apps/api`). No duplica reglas de negocio: el
 precio, el descuento y la disponibilidad los decide el servidor, y la app los
@@ -33,7 +42,7 @@ flutter build web --release --dart-define=REMATA_API=https://staging.remata.app
 
 ```bash
 flutter analyze   # sin avisos
-flutter test      # 18 pruebas
+flutter test      # 38 pruebas
 ```
 
 Las pruebas de widget montan cada pantalla contra un cliente HTTP simulado, así
@@ -46,9 +55,9 @@ orden, listados vacíos y fallos de red— sin necesidad de servidor ni navegado
 | --- | --- |
 | `lib/design/` | Tokens de color, tipografía y espaciado, más los componentes compartidos. |
 | `lib/datos/` | Cliente HTTP, modelos del dominio y el repositorio que usan las pantallas. |
-| `lib/pantallas/` | Una pantalla por archivo: autenticación, catálogo, detalle y pedidos. |
+| `lib/pantallas/` | Una pantalla por archivo. Comprador: `auth`, `catalogo`, `detalle`, `pedidos`. Comercio: `publicaciones`, `nueva_publicacion`, `ordenes_recibidas`. |
 
-Dos decisiones que conviene conocer antes de tocar el código:
+Tres decisiones que conviene conocer antes de tocar el código:
 
 **El diseño visual está centralizado a propósito.** Todo color, tamaño y
 espaciado sale de `lib/design/tokens.dart`. El rediseño pendiente con el equipo
@@ -57,12 +66,21 @@ de diseño se aplica cambiando ese archivo, no recorriendo las pantallas
 
 **Los importes viajan como enteros en centavos**, junto con su moneda, y solo se
 formatean al pintarlos. Nunca se opera con decimales: en dinero, redondear dos
-veces es perder un centavo. Panamá usa el balboa, que se muestra `B/.`.
+veces es perder un centavo. Lo que la persona teclea (`7,25`, `7.25`, `7`) se
+convierte partiendo en unidades y céntimos, no multiplicando por cien en coma
+flotante. La moneda la manda el servidor en cada registro y la pantalla la
+sigue; el MVP opera en USD según el modelo canónico de datos.
+
+**Solo se ofrece la acción que la API acepta.** Un borrador se publica, uno
+publicado se pausa; sobre un vencido o un retirado no se ofrece nada. Un botón
+que solo puede devolver 400 es peor que ningún botón.
 
 ## Qué falta
 
-Esta entrega cubre al comprador. Quedan pendientes el panel del comercio, las
-notificaciones push y el resto de pantallas de los mockups.
+Quedan pendientes las notificaciones push, la reputación del propio comercio
+—la API la indexa por `merchantId` y al iniciar sesión la app solo recibe el
+`userId`, así que hace falta un endpoint de «mi comercio»— y el resto de
+pantallas de los mockups.
 
 Las compilaciones de Android necesitan el SDK 36; la máquina de desarrollo
 actual tiene el 35.
