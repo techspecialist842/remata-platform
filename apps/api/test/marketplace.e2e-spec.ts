@@ -280,6 +280,79 @@ describe('Marketplace (e2e)', () => {
       .expect(400);
   });
 
+  // Sin las líneas, una orden es un número y un importe: el comercio no sabe
+  // qué preparar y quien compró no reconoce su propia reserva.
+  it('ambos listados de órdenes dicen qué se compró', async () => {
+    const rescateId = await publicarRescate(4, 1200, 'lineas');
+    await http()
+      .post('/api/v1/ordenes')
+      .set('Authorization', `Bearer ${compradorToken}`)
+      .set('Idempotency-Key', key('orden-lineas'))
+      .send({ rescateId, cantidad: 2 })
+      .expect(201);
+
+    const titulo = `Rescate lineas ${runId}`;
+    const lineaDe = (cuerpo: unknown) =>
+      (cuerpo as { items: { items: { tituloSnapshot: string }[] }[] }).items
+        .flatMap((o) => o.items)
+        .find((l) => l.tituloSnapshot === titulo);
+
+    const mias = await http()
+      .get('/api/v1/ordenes/mias')
+      .set('Authorization', `Bearer ${compradorToken}`)
+      .expect(200);
+    expect(lineaDe(mias.body)).toBeDefined();
+
+    const recibidas = await http()
+      .get('/api/v1/ordenes/recibidas')
+      .set('Authorization', `Bearer ${comercioToken}`)
+      .expect(200);
+    const linea = lineaDe(recibidas.body) as unknown as {
+      cantidad: number;
+      precioUnitarioCentavos: number;
+    };
+    expect(linea).toBeDefined();
+    expect(linea.cantidad).toBe(2);
+    // Copia tomada en la compra: el precio de la línea no sigue al de la
+    // publicación si esta cambia después.
+    expect(linea.precioUnitarioCentavos).toBe(1200);
+  });
+
+  // La garantía que promete Idempotency-Key: un reintento inmediato —el caso
+  // real, tras un corte de red— no debe crear una segunda orden ni consumir
+  // stock dos veces. El reintento se lanza en cuanto vuelve la primera
+  // respuesta, que es exactamente la ventana que dejaba abierta guardar el
+  // registro sin esperar.
+  //
+  // Dos peticiones *simultáneas* con la misma clave son otro problema: ambas
+  // consultan antes de que exista registro alguno, así que ninguna cachea a la
+  // otra. Ahí lo que protege el inventario es la reserva atómica, cubierta por
+  // la prueba de sobreventa.
+  it('un reintento inmediato con la misma clave no duplica la orden', async () => {
+    const rescateId = await publicarRescate(5, 1000, 'reintento');
+    const clave = key('orden-reintento');
+
+    const enviar = () =>
+      http()
+        .post('/api/v1/ordenes')
+        .set('Authorization', `Bearer ${compradorToken}`)
+        .set('Idempotency-Key', clave)
+        .send({ rescateId, cantidad: 2 });
+
+    const primera = await enviar().expect(201);
+    const reintento = await enviar().expect(201);
+
+    // Misma orden devuelta, no una nueva.
+    expect(asOrden(reintento.body).id).toBe(asOrden(primera.body).id);
+    expect(asOrden(reintento.body).numero).toBe(asOrden(primera.body).numero);
+
+    // Y el inventario se tocó una sola vez: 5 - 2 = 3.
+    const rescate = await http()
+      .get(`/api/v1/catalogo/rescates/${rescateId}`)
+      .expect(200);
+    expect(asRescate(rescate.body).cantidadDisponible).toBe(3);
+  });
+
   it('impide que un comprador publique rescates (control de rol)', async () => {
     await http()
       .post('/api/v1/catalogo/rescates')

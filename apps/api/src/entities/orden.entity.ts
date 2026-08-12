@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -10,6 +11,7 @@ import {
   CancelacionMotivo,
   OrdenStatus,
 } from '../common/enums/marketplace.enum';
+import { OrdenItem } from './orden-item.entity';
 
 @Entity('ordenes')
 @Index(['compradorId', 'status'])
@@ -17,6 +19,12 @@ import {
 export class Orden {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  // Inverse side only: no column and no schema change, so no migration. Lets
+  // the order lists say *what* was ordered — a merchant cannot confirm an
+  // order they can only identify by number.
+  @OneToMany(() => OrdenItem, (item) => item.orden)
+  items: OrdenItem[];
 
   /** Human-facing reference, safe to read out loud or print. */
   @Index({ unique: true })

@@ -23,6 +23,30 @@ export function configureApp(app: INestApplication): void {
   app.use(json());
   app.use(urlencoded({ extended: true }));
 
+  // Cross-origin access is closed unless an environment names the origins it
+  // trusts, e.g. CORS_ORIGINS=https://admin.remata.app,http://localhost:8080.
+  // An allowlist rather than '*': with '*' any site a user visits could call
+  // this API with their session. Native mobile builds are unaffected either
+  // way — CORS is a browser policy — but the web build and the coming admin
+  // panel need it.
+  const origenes = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  if (origenes.length > 0) {
+    app.enableCors({
+      origin: origenes,
+      credentials: true,
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'Idempotency-Key',
+        'X-Correlation-Id',
+      ],
+      exposedHeaders: ['X-Correlation-Id'],
+    });
+  }
+
   // No HTTPS listener exists until a domain is configured (see
   // infra/terraform modules/alb), so two of Helmet's secure-by-default
   // behaviors actively break the plain-HTTP site rather than harmlessly

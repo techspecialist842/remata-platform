@@ -9,9 +9,9 @@ import {
 import { Reflector } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { Observable, of } from 'rxjs';
-import { tap } from 'rxjs/operators';
+import { concatMap } from 'rxjs/operators';
 import * as crypto from 'crypto';
 import { IdempotencyKey } from '../../entities/idempotency-key.entity';
 import { IDEMPOTENT_KEY } from '../decorators/idempotent.decorator';
@@ -58,6 +58,8 @@ export class IdempotencyInterceptor implements NestInterceptor {
       .update(JSON.stringify(request.body ?? {}))
       .digest('hex');
 
+    const response = context.switchToHttp().getResponse<Response>();
+
     const existing = await this.repo.findOne({ where: { key: compositeKey } });
     if (existing) {
       if (existing.requestHash !== requestHash) {
@@ -65,21 +67,36 @@ export class IdempotencyInterceptor implements NestInterceptor {
           'Idempotency-Key was already used with a different request payload',
         );
       }
+      // Replay the original status too, not just the body: without this the
+      // replay would carry the route's default status, so a 200 handler would
+      // answer 201 the second time and callers keyed on the code would diverge.
+      response.status(existing.responseStatus);
       return of(existing.responseBody);
     }
 
     return next.handle().pipe(
-      tap((responseBody: unknown) => {
+      // The record is written BEFORE the response is emitted, deliberately.
+      //
+      // Saving it fire-and-forget leaves a window between answering and
+      // committing: a retry arriving inside that window finds no record and
+      // runs the operation a second time. That is precisely when clients
+      // retry — right after a dropped connection — and for POST /ordenes it
+      // would mean a duplicate order consuming stock twice. Paying for one
+      // synchronous write is the price of the guarantee this decorator makes.
+      concatMap(async (responseBody: unknown) => {
         const entry = this.repo.create({
           key: compositeKey,
           requestHash,
-          responseStatus: 200,
+          responseStatus: response.statusCode,
           responseBody: responseBody ?? null,
         });
-        void this.repo.save(entry).catch(() => {
-          // Duplicate insert from a genuinely concurrent retry with the same key
-          // is fine to swallow — the stored row already reflects the same request.
-        });
+        try {
+          await this.repo.save(entry);
+        } catch {
+          // A genuinely concurrent retry won the insert. The stored row
+          // reflects the same request, so answering normally is correct.
+        }
+        return responseBody;
       }),
     );
   }

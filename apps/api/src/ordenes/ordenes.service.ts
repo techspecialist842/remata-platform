@@ -308,9 +308,14 @@ export class OrdenesService {
     return vencidas.length;
   }
 
+  // Ambos listados cargan sus líneas: una orden identificada solo por número no
+  // le sirve a nadie. El comercio necesita saber qué debe preparar y quien
+  // compró, qué reservó. El título viaja como copia tomada en la compra, así
+  // que sigue siendo fiel aunque la publicación cambie después.
   async misOrdenes(compradorId: string, page = 1, pageSize = 20) {
     const [items, total] = await this.ordenes.findAndCount({
       where: { compradorId },
+      relations: { items: true },
       order: { createdAt: 'DESC' },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -322,6 +327,7 @@ export class OrdenesService {
     const merchant = await this.merchantDe(userId);
     const [items, total] = await this.ordenes.findAndCount({
       where: { merchantId: merchant.id },
+      relations: { items: true },
       order: { createdAt: 'DESC' },
       skip: (page - 1) * pageSize,
       take: pageSize,
