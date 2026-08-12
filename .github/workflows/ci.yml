@@ -54,6 +54,34 @@ jobs:
       - name: Build Docker image (no push — validates the Dockerfile only)
         run: docker build -t remata-api:ci .
 
+  movil:
+    name: Móvil — analyze, test, build web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.8'
+          cache: true
+
+      - run: flutter pub get
+
+      # Sin avisos, no "pocos avisos": un aviso tolerado se vuelve cien.
+      - name: flutter analyze
+        run: flutter analyze --fatal-infos --fatal-warnings
+
+      - run: flutter test
+
+      # Compilar la web valida todo el árbol de widgets de una forma que el
+      # análisis estático no alcanza, y es el artefacto con el que se prueba
+      # la app sin necesitar un dispositivo.
+      - name: flutter build web
+        run: flutter build web --release
+
   terraform:
     name: Terraform — fmt & validate
     runs-on: ubuntu-latest
