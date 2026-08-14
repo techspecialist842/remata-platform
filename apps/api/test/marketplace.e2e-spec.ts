@@ -353,6 +353,38 @@ describe('Marketplace (e2e)', () => {
     expect(asRescate(rescate.body).cantidadDisponible).toBe(3);
   });
 
+  // La sesión solo lleva el userId, pero la reputación se indexa por
+  // merchantId. Sin este endpoint un comercio no puede preguntar por lo suyo.
+  it('un comercio puede consultar su perfil y con él su reputación', async () => {
+    const perfil = await http()
+      .get('/api/v1/catalogo/mi-comercio')
+      .set('Authorization', `Bearer ${comercioToken}`)
+      .expect(200);
+
+    const merchant = perfil.body as { id: string; legalName: string };
+    expect(merchant.id).toEqual(expect.any(String));
+    expect(merchant.legalName).toBe(`com-${runId}@test.com`);
+
+    // La reputación exige sesión: los guards están en el controlador entero.
+    const reputacion = await http()
+      .get(`/api/v1/ordenes/reputacion/${merchant.id}`)
+      .set('Authorization', `Bearer ${comercioToken}`)
+      .expect(200);
+    // Este comercio cumplió órdenes durante la suite, así que el contador no
+    // puede seguir en cero: comprueba que el id devuelto es el correcto y no
+    // uno cualquiera que simplemente exista.
+    expect(
+      (reputacion.body as { ordenesCumplidas: number }).ordenesCumplidas,
+    ).toBeGreaterThan(0);
+  });
+
+  it('un comprador no puede pedir un perfil de comercio', async () => {
+    await http()
+      .get('/api/v1/catalogo/mi-comercio')
+      .set('Authorization', `Bearer ${compradorToken}`)
+      .expect(403);
+  });
+
   it('impide que un comprador publique rescates (control de rol)', async () => {
     await http()
       .post('/api/v1/catalogo/rescates')

@@ -49,7 +49,21 @@ export class CatalogoController {
     return this.catalogo.verPublicado(id);
   }
 
-  // --- Comercio: gestión de sus propias publicaciones.
+  // --- Comercio: su perfil y sus propias publicaciones.
+  @Get('mi-comercio')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.COMERCIO)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Ver mi perfil de comercio',
+    description:
+      'Devuelve el merchantId, que es la clave con la que se consulta la reputación propia: la sesión solo lleva el userId.',
+  })
+  @ApiErrorResponses(401, 403)
+  miComercio(@CurrentUser() user: AuthenticatedUser) {
+    return this.catalogo.miComercio(user.userId);
+  }
+
   @Post('rescates')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.COMERCIO)
