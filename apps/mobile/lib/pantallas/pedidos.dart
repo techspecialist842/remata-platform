@@ -71,6 +71,31 @@ class _PantallaPedidosState extends State<PantallaPedidos> {
     }
   }
 
+  Future<void> _calificar(Orden orden) async {
+    final resena = await showDialog<({int calificacion, String comentario})>(
+      context: context,
+      builder: (_) => _DialogoCalificar(numero: orden.numero),
+    );
+    if (resena == null) return;
+
+    try {
+      await widget.repo.resenarOrden(
+        orden.id,
+        calificacion: resena.calificacion,
+        comentario: resena.comentario,
+      );
+      if (!mounted) return;
+      _recargar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('¡Gracias por calificar!')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('No se pudo calificar: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -111,6 +136,7 @@ class _PantallaPedidosState extends State<PantallaPedidos> {
               itemBuilder: (_, i) => _TarjetaOrden(
                 orden: pagina.items[i],
                 alCancelar: () => _cancelar(pagina.items[i]),
+                alCalificar: () => _calificar(pagina.items[i]),
               ),
             );
           },
@@ -121,10 +147,15 @@ class _PantallaPedidosState extends State<PantallaPedidos> {
 }
 
 class _TarjetaOrden extends StatelessWidget {
-  const _TarjetaOrden({required this.orden, required this.alCancelar});
+  const _TarjetaOrden({
+    required this.orden,
+    required this.alCancelar,
+    required this.alCalificar,
+  });
 
   final Orden orden;
   final VoidCallback alCancelar;
+  final VoidCallback alCalificar;
 
   /// Colour supports the label, never replaces it — the state is always spelled out.
   ({String texto, Color fondo, Color color}) get _estado => switch (orden.estado) {
@@ -175,6 +206,10 @@ class _TarjetaOrden extends StatelessWidget {
                 Etiqueta(e.texto, fondo: e.fondo, color: e.color),
               ],
             ),
+            const SizedBox(height: RTokens.s2),
+            // Un número de orden no le dice nada a nadie: hay que poder
+            // reconocer la propia reserva de un vistazo.
+            Text(orden.resumen, style: RTokens.body),
             const SizedBox(height: RTokens.s3),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -203,9 +238,140 @@ class _TarjetaOrden extends StatelessWidget {
                 child: const Text('Cancelar reserva'),
               ),
             ],
+
+            // Calificar solo tiene sentido sobre lo ya entregado, y una sola
+            // vez: la API responde 409 al segundo intento, así que en cuanto
+            // hay reseña se muestra la nota en lugar del botón.
+            if (orden.estado == EstadoOrden.cumplida) ...[
+              const SizedBox(height: RTokens.s3),
+              if (orden.resena == null)
+                ElevatedButton.icon(
+                  onPressed: alCalificar,
+                  icon: const Icon(Icons.star_outline, size: 18),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44),
+                  ),
+                  label: const Text('Calificar'),
+                )
+              else
+                _NotaDada(resena: orden.resena!),
+            ],
           ],
         ),
       ),
+    );
+  }
+}
+
+/// La nota que ya dejó el comprador, en lugar del botón de calificar.
+class _NotaDada extends StatelessWidget {
+  const _NotaDada({required this.resena});
+
+  final ResenaPropia resena;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // Cinco estrellas siempre, rellenas hasta la nota: así se lee
+              // cuánto se calificó sobre cuánto, sin tener que contar.
+              for (var i = 1; i <= 5; i++)
+                Icon(
+                  i <= resena.calificacion ? Icons.star : Icons.star_border,
+                  size: 20,
+                  color: RTokens.accent,
+                ),
+              const SizedBox(width: RTokens.s2),
+              Text('Ya calificaste', style: RTokens.bodySm),
+            ],
+          ),
+          if (resena.comentario != null) ...[
+            const SizedBox(height: RTokens.s2),
+            Text('«${resena.comentario!}»', style: RTokens.bodySm),
+          ],
+        ],
+      );
+}
+
+/// Diálogo de calificación: estrellas obligatorias, comentario opcional.
+class _DialogoCalificar extends StatefulWidget {
+  const _DialogoCalificar({required this.numero});
+
+  final String numero;
+
+  @override
+  State<_DialogoCalificar> createState() => _DialogoCalificarState();
+}
+
+class _DialogoCalificarState extends State<_DialogoCalificar> {
+  int _calificacion = 0;
+  final _comentario = TextEditingController();
+
+  @override
+  void dispose() {
+    _comentario.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(RTokens.radiusLg),
+      ),
+      title: const Text('¿Cómo te fue?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Orden ${widget.numero}', style: RTokens.bodySm),
+          const SizedBox(height: RTokens.s3),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              for (var i = 1; i <= 5; i++)
+                IconButton(
+                  onPressed: () => setState(() => _calificacion = i),
+                  // Área táctil cómoda: es el control principal del diálogo.
+                  iconSize: 34,
+                  tooltip: '$i de 5',
+                  icon: Icon(
+                    i <= _calificacion ? Icons.star : Icons.star_border,
+                    color: RTokens.accent,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: RTokens.s2),
+          TextField(
+            controller: _comentario,
+            maxLines: 3,
+            maxLength: 1000,
+            decoration: const InputDecoration(
+              hintText: 'Contá cómo fue (opcional)',
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Ahora no'),
+        ),
+        TextButton(
+          // Deshabilitado hasta elegir estrellas: la API exige de 1 a 5, y un
+          // botón que solo puede fallar es peor que uno apagado.
+          onPressed: _calificacion == 0
+              ? null
+              : () => Navigator.of(context).pop((
+                    calificacion: _calificacion,
+                    comentario: _comentario.text,
+                  )),
+          child: const Text('Enviar'),
+        ),
+      ],
     );
   }
 }

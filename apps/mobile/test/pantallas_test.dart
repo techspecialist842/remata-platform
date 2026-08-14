@@ -155,6 +155,7 @@ void main() {
       String estado = 'creada',
       int total = 720,
       int descuento = 0,
+      Map<String, dynamic>? resena,
     }) =>
         {
           'id': 'o1',
@@ -164,6 +165,16 @@ void main() {
           'descuentoCentavos': descuento,
           'totalCentavos': total,
           'moneda': 'PAB',
+          'items': [
+            {
+              'rescateId': 'r1',
+              'tituloSnapshot': 'Pan artesanal',
+              'precioUnitarioCentavos': (total + descuento) ~/ 2,
+              'cantidad': 2,
+              'totalLineaCentavos': total + descuento,
+            }
+          ],
+          'resena': resena,
           'createdAt': DateTime.now().toIso8601String(),
           'expiraAt': DateTime.now()
               .add(const Duration(minutes: 30))
@@ -180,6 +191,8 @@ void main() {
 
       expect(find.text('R-260811-ABCD1234'), findsOneWidget);
       expect(find.text('Confirmada — pasá a retirarla'), findsOneWidget);
+      // Un número de orden no basta para reconocer la propia reserva.
+      expect(find.text('2 × Pan artesanal'), findsOneWidget);
     });
 
     testWidgets('ofrece cancelar mientras la orden sigue pendiente',
@@ -214,6 +227,80 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Ahorraste B/. 1.20'), findsOneWidget);
+    });
+
+    // Calificar solo se ofrece sobre lo entregado y solo una vez: la API
+    // responde 409 al segundo intento, y un botón que solo puede fallar es
+    // peor que ningún botón.
+    testWidgets('ofrece calificar una orden entregada sin reseñar',
+        (tester) async {
+      final repo = repoCon(MockClient((_) async =>
+          respuesta(ordenesJson([orden(estado: 'cumplida')]))));
+
+      await tester.pumpWidget(envolver(PantallaPedidos(repo: repo)));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Calificar'), findsOneWidget);
+    });
+
+    testWidgets('no ofrece calificar lo que todavía no se entregó',
+        (tester) async {
+      for (final estado in ['creada', 'confirmada', 'cancelada']) {
+        final repo = repoCon(MockClient(
+            (_) async => respuesta(ordenesJson([orden(estado: estado)]))));
+
+        await tester.pumpWidget(envolver(PantallaPedidos(repo: repo)));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Calificar'), findsNothing, reason: estado);
+      }
+    });
+
+    testWidgets('una vez calificada muestra la nota, no el botón',
+        (tester) async {
+      final repo = repoCon(MockClient((_) async => respuesta(ordenesJson([
+            orden(
+              estado: 'cumplida',
+              resena: {'calificacion': 4, 'comentario': 'Muy bien'},
+            )
+          ]))));
+
+      await tester.pumpWidget(envolver(PantallaPedidos(repo: repo)));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Calificar'), findsNothing);
+      expect(find.text('Ya calificaste'), findsOneWidget);
+      expect(find.text('«Muy bien»'), findsOneWidget);
+      // Cinco estrellas siempre: cuatro llenas y una vacía.
+      expect(find.byIcon(Icons.star), findsNWidgets(4));
+      expect(find.byIcon(Icons.star_border), findsOneWidget);
+    });
+
+    testWidgets('el envío queda bloqueado hasta elegir estrellas',
+        (tester) async {
+      var envios = 0;
+      final repo = repoCon(MockClient((req) async {
+        if (req.method == 'POST') envios++;
+        return respuesta(ordenesJson([orden(estado: 'cumplida')]));
+      }));
+
+      await tester.pumpWidget(envolver(PantallaPedidos(repo: repo)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Calificar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Cómo te fue?'), findsOneWidget);
+
+      // Sin estrellas la API rechazaría el envío, así que el botón está apagado.
+      final enviar = tester.widget<TextButton>(
+        find.widgetWithText(TextButton, 'Enviar'),
+      );
+      expect(enviar.onPressed, isNull);
+
+      await tester.tap(find.text('Enviar'));
+      await tester.pumpAndSettle();
+      expect(envios, 0);
+      expect(find.text('¿Cómo te fue?'), findsOneWidget); // sigue abierto
     });
 
     testWidgets('sin pedidos, invita en vez de mostrar una pantalla vacía',
