@@ -153,6 +153,45 @@ describe('Marketplace (e2e)', () => {
       .set('Authorization', `Bearer ${compradorToken}`)
       .send({ calificacion: 1 })
       .expect(409);
+
+    // El listado dice que ya está reseñada, y con qué nota. Sin esto la app no
+    // puede distinguir una orden calificada de una pendiente de calificar, y
+    // acabaría ofreciendo un botón que solo puede devolver 409.
+    const mias = await http()
+      .get('/api/v1/ordenes/mias')
+      .set('Authorization', `Bearer ${compradorToken}`)
+      .expect(200);
+
+    const enListado = (
+      mias.body as {
+        items: {
+          id: string;
+          resena: { calificacion: number; comentario: string | null } | null;
+        }[];
+      }
+    ).items.find((o) => o.id === orden.id);
+    expect(enListado?.resena?.calificacion).toBe(5);
+    expect(enListado?.resena?.comentario).toBe('Todo perfecto');
+  });
+
+  it('una orden sin reseñar se distingue de una reseñada', async () => {
+    const rescateId = await publicarRescate(1, 900, 'sinresena');
+    await http()
+      .post('/api/v1/ordenes')
+      .set('Authorization', `Bearer ${compradorToken}`)
+      .set('Idempotency-Key', key('orden-sinresena'))
+      .send({ rescateId, cantidad: 1 })
+      .expect(201);
+
+    const mias = await http()
+      .get('/api/v1/ordenes/mias')
+      .set('Authorization', `Bearer ${compradorToken}`)
+      .expect(200);
+
+    const sinResenar = (
+      mias.body as { items: { numero: string; resena: unknown }[] }
+    ).items.filter((o) => o.resena === null);
+    expect(sinResenar.length).toBeGreaterThan(0);
   });
 
   // El caso que justifica la reserva atómica: sin ella, ambos compradores

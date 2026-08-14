@@ -6,12 +6,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, LessThan, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, LessThan, Repository } from 'typeorm';
 import * as crypto from 'crypto';
 import { Orden } from '../entities/orden.entity';
 import { OrdenItem } from '../entities/orden-item.entity';
 import { Rescate } from '../entities/rescate.entity';
 import { Merchant } from '../entities/merchant.entity';
+import { Resena } from '../entities/resena.entity';
 import {
   CancelacionMotivo,
   OrdenStatus,
@@ -45,6 +46,7 @@ export class OrdenesService {
     @InjectRepository(Orden) private readonly ordenes: Repository<Orden>,
     @InjectRepository(Merchant)
     private readonly merchants: Repository<Merchant>,
+    @InjectRepository(Resena) private readonly resenas: Repository<Resena>,
     private readonly dataSource: DataSource,
     private readonly cupones: CuponesService,
     private readonly reputacion: ReputacionService,
@@ -320,7 +322,35 @@ export class OrdenesService {
       skip: (page - 1) * pageSize,
       take: pageSize,
     });
-    return { items, total, page, pageSize };
+
+    // Cada orden dice si ya fue reseñada, y con qué nota.
+    //
+    // Sin esto el cliente no puede saberlo y acabaría ofreciendo «calificar»
+    // sobre algo ya calificado, para cosechar un 409. Se resuelve con una
+    // consulta aparte en lugar de una relación en la entidad: la tabla de
+    // reseñas solo guarda orden_id con índice único, y declarar la relación
+    // añadiría una clave foránea, es decir, una migración por una comodidad.
+    const resenas = items.length
+      ? await this.resenas.find({
+          where: { ordenId: In(items.map((o) => o.id)) },
+        })
+      : [];
+    const porOrden = new Map(resenas.map((r) => [r.ordenId, r]));
+
+    return {
+      items: items.map((orden) => ({
+        ...orden,
+        resena: porOrden.get(orden.id)
+          ? {
+              calificacion: porOrden.get(orden.id)!.calificacion,
+              comentario: porOrden.get(orden.id)!.comentario,
+            }
+          : null,
+      })),
+      total,
+      page,
+      pageSize,
+    };
   }
 
   async ordenesDelComercio(userId: string, page = 1, pageSize = 20) {
