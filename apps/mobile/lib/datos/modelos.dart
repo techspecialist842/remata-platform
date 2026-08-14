@@ -128,12 +128,26 @@ class LineaOrden {
       );
 }
 
+/// La calificación que ya dejó el comprador sobre una orden.
+class ResenaPropia {
+  ResenaPropia({required this.calificacion, required this.comentario});
+
+  final int calificacion;
+  final String? comentario;
+
+  factory ResenaPropia.desdeJson(Map<String, dynamic> j) => ResenaPropia(
+        calificacion: j['calificacion'] as int,
+        comentario: j['comentario'] as String?,
+      );
+}
+
 class Orden {
   Orden({
     required this.id,
     required this.numero,
     required this.estado,
     required this.lineas,
+    required this.resena,
     required this.subtotalCentavos,
     required this.descuentoCentavos,
     required this.totalCentavos,
@@ -146,6 +160,10 @@ class Orden {
   final String numero;
   final EstadoOrden estado;
   final List<LineaOrden> lineas;
+
+  /// Nula mientras el comprador no haya calificado. La API solo admite una
+  /// reseña por orden, así que esto es lo que decide si se ofrece calificar.
+  final ResenaPropia? resena;
   final int subtotalCentavos;
   final int descuentoCentavos;
   final int totalCentavos;
@@ -167,6 +185,10 @@ class Orden {
         lineas: ((j['items'] as List<dynamic>?) ?? const [])
             .map((e) => LineaOrden.desdeJson(e as Map<String, dynamic>))
             .toList(),
+        // Solo viaja en el listado del comprador: al comercio no le compete.
+        resena: j['resena'] == null
+            ? null
+            : ResenaPropia.desdeJson(j['resena'] as Map<String, dynamic>),
         subtotalCentavos: j['subtotalCentavos'] as int,
         descuentoCentavos: (j['descuentoCentavos'] as int?) ?? 0,
         totalCentavos: j['totalCentavos'] as int,

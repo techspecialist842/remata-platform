@@ -116,6 +116,24 @@ class Repositorio {
     return Pagina.desdeJson(r, Orden.desdeJson);
   }
 
+  /// Solo el comprador de una orden cumplida, y una sola vez: el servidor
+  /// responde 409 al segundo intento.
+  Future<void> resenarOrden(
+    String ordenId, {
+    required int calificacion,
+    String? comentario,
+  }) async {
+    await api.post(
+      '/api/v1/ordenes/$ordenId/resena',
+      idempotencyKey: _clave('res'),
+      cuerpo: {
+        'calificacion': calificacion,
+        if (comentario != null && comentario.trim().isNotEmpty)
+          'comentario': comentario.trim(),
+      },
+    );
+  }
+
   /// [motivo] lo decide quien cancela: el comprador solo puede alegar
   /// 'comprador'; el comercio, 'comercio' o 'no_show'. El servidor lo verifica.
   Future<void> cancelarOrden(String id, {String motivo = 'comprador'}) async {
