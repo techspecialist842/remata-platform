@@ -5,6 +5,7 @@ import 'design/tema.dart';
 import 'design/tokens.dart';
 import 'pantallas/auth.dart';
 import 'pantallas/catalogo.dart';
+import 'pantallas/cuenta_comercio.dart';
 import 'pantallas/ordenes_recibidas.dart';
 import 'pantallas/pedidos.dart';
 import 'pantallas/publicaciones.dart';
@@ -118,11 +119,7 @@ class _NavegacionComercioState extends State<_NavegacionComercio> {
     final paginas = [
       PantallaPublicaciones(repo: widget.repo),
       PantallaOrdenesRecibidas(repo: widget.repo),
-      _PantallaCuenta(
-        alSalir: widget.alSalir,
-        aviso: 'Facturación, horarios de retiro y estadísticas del comercio '
-            'llegan en fases siguientes.',
-      ),
+      PantallaCuentaComercio(repo: widget.repo, alSalir: widget.alSalir),
     ];
 
     return Scaffold(
@@ -153,10 +150,9 @@ class _NavegacionComercioState extends State<_NavegacionComercio> {
 }
 
 class _PantallaCuenta extends StatelessWidget {
-  const _PantallaCuenta({required this.alSalir, this.aviso});
+  const _PantallaCuenta({required this.alSalir});
 
   final VoidCallback alSalir;
-  final String? aviso;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -170,15 +166,14 @@ class _PantallaCuenta extends StatelessWidget {
                 color: RTokens.primarySoft,
                 borderRadius: BorderRadius.circular(RTokens.radiusLg),
               ),
-              child: Row(
+              child: const Row(
                 children: [
-                  const Icon(Icons.info_outline, color: RTokens.primary),
-                  const SizedBox(width: RTokens.s3),
+                  Icon(Icons.info_outline, color: RTokens.primary),
+                  SizedBox(width: RTokens.s3),
                   Expanded(
                     child: Text(
-                      aviso ??
-                          'Perfil, direcciones, métodos de pago y REMATA '
-                              'Points llegan en fases siguientes.',
+                      'Perfil, direcciones, métodos de pago y REMATA Points '
+                      'llegan en fases siguientes.',
                       style: RTokens.bodySm,
                     ),
                   ),

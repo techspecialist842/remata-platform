@@ -176,6 +176,52 @@ class Orden {
       );
 }
 
+/// Perfil comercial de quien tiene la sesión abierta.
+///
+/// Su `id` no es el del usuario: es la clave con la que la API indexa las
+/// órdenes y la reputación.
+class Comercio {
+  Comercio({
+    required this.id,
+    required this.nombreLegal,
+    required this.verificado,
+  });
+
+  final String id;
+  final String nombreLegal;
+  final bool verificado;
+
+  factory Comercio.desdeJson(Map<String, dynamic> j) => Comercio(
+        id: j['id'] as String,
+        nombreLegal: j['legalName'] as String,
+        verificado: (j['isVerified'] as bool?) ?? false,
+      );
+}
+
+/// Reputación acumulada de un comercio o de un comprador.
+class Reputacion {
+  Reputacion({
+    required this.promedio,
+    required this.totalResenas,
+    required this.ordenesCumplidas,
+    required this.noShows,
+  });
+
+  /// Nulo mientras no haya ninguna reseña: distinto de cero, que sería la peor
+  /// nota posible. Un comercio nuevo no arranca con mala fama.
+  final double? promedio;
+  final int totalResenas;
+  final int ordenesCumplidas;
+  final int noShows;
+
+  factory Reputacion.desdeJson(Map<String, dynamic> j) => Reputacion(
+        promedio: (j['promedio'] as num?)?.toDouble(),
+        totalResenas: (j['totalResenas'] as int?) ?? 0,
+        ordenesCumplidas: (j['ordenesCumplidas'] as int?) ?? 0,
+        noShows: (j['noShows'] as int?) ?? 0,
+      );
+}
+
 class Pagina<T> {
   Pagina({required this.items, required this.total});
 

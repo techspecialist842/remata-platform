@@ -7,6 +7,7 @@ import 'package:remata_movil/datos/api.dart';
 import 'package:remata_movil/datos/modelos.dart';
 import 'package:remata_movil/datos/repositorio.dart';
 import 'package:remata_movil/design/tema.dart';
+import 'package:remata_movil/pantallas/cuenta_comercio.dart';
 import 'package:remata_movil/pantallas/nueva_publicacion.dart';
 import 'package:remata_movil/pantallas/ordenes_recibidas.dart';
 import 'package:remata_movil/pantallas/publicaciones.dart';
@@ -260,6 +261,127 @@ void main() {
       await tester.tap(find.text('No, volver'));
       await tester.pumpAndSettle();
       expect(llamadas, 0);
+    });
+  });
+
+  group('Mi comercio', () {
+    /// La pantalla encadena dos llamadas: perfil y, con su id, reputación.
+    MockClient clienteCon({
+      double? promedio,
+      int resenas = 0,
+      int cumplidas = 0,
+      int noShows = 0,
+      bool verificado = false,
+    }) =>
+        MockClient((req) async {
+          if (req.url.path.endsWith('/mi-comercio')) {
+            return respuesta(jsonEncode({
+              'id': 'm1',
+              'legalName': 'Panadería La Espiga',
+              'isVerified': verificado,
+            }));
+          }
+          // Solo responde si preguntan por el id que devolvió el perfil: así la
+          // prueba falla si la pantalla usa el userId por descuido.
+          if (req.url.path.endsWith('/reputacion/m1')) {
+            return respuesta(jsonEncode({
+              'promedio': promedio,
+              'totalResenas': resenas,
+              'ordenesCumplidas': cumplidas,
+              'noShows': noShows,
+            }));
+          }
+          return respuesta(jsonEncode({'message': 'ruta inesperada'}), 404);
+        });
+
+    Widget pantalla(MockClient c) => envolver(
+          PantallaCuentaComercio(repo: repoCon(c), alSalir: () {}),
+        );
+
+    testWidgets('muestra el nombre y la calificación media', (tester) async {
+      await tester.pumpWidget(
+          pantalla(clienteCon(promedio: 4.7, resenas: 12, cumplidas: 30)));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Panadería La Espiga'), findsOneWidget);
+      expect(find.text('4.7'), findsOneWidget);
+      expect(find.text('de 12 reseñas'), findsOneWidget);
+      expect(find.text('30 órdenes entregadas'), findsOneWidget);
+    });
+
+    // Un comercio nuevo no debe aparecer con un 0: sería acusarlo de algo que
+    // nadie dijo. Sin reseñas no hay nota.
+    testWidgets('sin reseñas no inventa una nota de cero', (tester) async {
+      await tester.pumpWidget(pantalla(clienteCon(cumplidas: 3)));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Todavía no te calificaron'), findsOneWidget);
+      expect(find.text('0.0'), findsNothing);
+      // Las entregas sí se cuentan aunque nadie haya calificado.
+      expect(find.text('3 órdenes entregadas'), findsOneWidget);
+    });
+
+    // El verde de la etiqueta afirma un logro; en cero no hay ninguno.
+    testWidgets('un comercio recién creado no exhibe contadores en cero',
+        (tester) async {
+      await tester.pumpWidget(pantalla(clienteCon()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Todavía no te calificaron'), findsOneWidget);
+      expect(find.textContaining('0 órdenes'), findsNothing);
+      expect(find.textContaining('no retir'), findsNothing);
+    });
+
+    // La API apunta el no-show contra el comprador que no retiró, nunca contra
+    // el comercio: este contador siempre vale cero en su propia ficha. Se
+    // ignora aunque venga con valor, para no exhibir una cifra inventada.
+    testWidgets('no muestra los no-shows aunque la API los devuelva',
+        (tester) async {
+      await tester.pumpWidget(pantalla(
+          clienteCon(promedio: 5, resenas: 2, cumplidas: 2, noShows: 3)));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('no retir'), findsNothing);
+      expect(find.textContaining('3'), findsNothing);
+    });
+
+    testWidgets('concuerda en singular con un solo caso', (tester) async {
+      await tester.pumpWidget(
+          pantalla(clienteCon(promedio: 4, resenas: 1, cumplidas: 1)));
+      await tester.pumpAndSettle();
+
+      expect(find.text('de 1 reseña'), findsOneWidget);
+      expect(find.text('1 orden entregada'), findsOneWidget);
+    });
+
+    // Se dice también cuando NO está verificado: callarlo dejaría creer que la
+    // verificación no existe.
+    testWidgets('dice cuando la verificación está pendiente', (tester) async {
+      await tester.pumpWidget(pantalla(clienteCon()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Verificación pendiente'), findsOneWidget);
+      expect(find.text('Comercio verificado'), findsNothing);
+    });
+
+    testWidgets('dice cuando el comercio está verificado', (tester) async {
+      await tester.pumpWidget(pantalla(clienteCon(verificado: true)));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Comercio verificado'), findsOneWidget);
+      expect(find.text('Verificación pendiente'), findsNothing);
+    });
+
+    testWidgets('un fallo se comunica y permite reintentar', (tester) async {
+      final repo = repoCon(MockClient(
+          (_) async => respuesta(jsonEncode({'message': 'caído'}), 500)));
+
+      await tester.pumpWidget(
+          envolver(PantallaCuentaComercio(repo: repo, alSalir: () {})));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No pudimos cargar tu comercio'), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
     });
   });
 
