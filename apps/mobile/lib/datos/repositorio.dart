@@ -184,7 +184,25 @@ class Repositorio {
   Future<void> cumplirOrden(String id) =>
       api.patch('/api/v1/ordenes/$id/cumplir');
 
-  // La reputación del propio comercio no se muestra todavía: la API la indexa
-  // por merchantId, y al iniciar sesión la app solo recibe el userId. Hace
-  // falta un endpoint de «mi comercio» antes de poder pedirla con fiabilidad.
+  Future<Comercio> miComercio() async {
+    final r = await api.get('/api/v1/catalogo/mi-comercio')
+        as Map<String, dynamic>;
+    return Comercio.desdeJson(r);
+  }
+
+  Future<Reputacion> reputacionDe(String sujetoId) async {
+    final r = await api.get('/api/v1/ordenes/reputacion/$sujetoId')
+        as Map<String, dynamic>;
+    return Reputacion.desdeJson(r);
+  }
+
+  /// Perfil y reputación en una sola espera.
+  ///
+  /// Van juntos porque la reputación se pide con el merchantId, que solo se
+  /// conoce tras la primera llamada: encadenarlas aquí evita que cada pantalla
+  /// repita esa dependencia.
+  Future<({Comercio comercio, Reputacion reputacion})> miComercioConReputacion() async {
+    final comercio = await miComercio();
+    return (comercio: comercio, reputacion: await reputacionDe(comercio.id));
+  }
 }

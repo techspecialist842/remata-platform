@@ -30,6 +30,17 @@ export class CatalogoService {
   ) {}
 
   /** Resolves the merchant profile for a user, or fails if they have none. */
+  /**
+   * El perfil comercial de quien llama.
+   *
+   * Existe porque la sesión solo entrega el userId, mientras que la reputación
+   * y las órdenes se indexan por merchantId. Sin esto, un comercio no tiene
+   * forma de preguntar por sus propios datos.
+   */
+  async miComercio(userId: string): Promise<Merchant> {
+    return this.merchantDe(userId);
+  }
+
   private async merchantDe(userId: string): Promise<Merchant> {
     const merchant = await this.merchants.findOne({ where: { userId } });
     if (!merchant) {
