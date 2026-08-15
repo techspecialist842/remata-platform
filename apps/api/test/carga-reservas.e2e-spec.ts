@@ -43,7 +43,14 @@ describe('Reservas bajo carga (e2e)', () => {
     }).compile();
     app = moduleFixture.createNestApplication({ bodyParser: false });
     configureApp(app);
-    await app.init();
+
+    // listen(), no solo init(): supertest levanta un servidor efímero por cada
+    // request() cuando el servidor no está escuchando. Con treinta peticiones a
+    // la vez eso son treinta servidores yendo y viniendo, y en un runner
+    // limitado algunas conexiones se cortan (ECONNRESET). Con el servidor ya
+    // escuchando, las treinta comparten uno solo y lo que se mide es la
+    // concurrencia sobre la base de datos, que es de lo que trata esta prueba.
+    await app.listen(0);
 
     const registrar = async (sufijo: string, role?: string) => {
       const r = await http()
