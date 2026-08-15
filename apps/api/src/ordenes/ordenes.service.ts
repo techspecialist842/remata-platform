@@ -122,9 +122,12 @@ export class OrdenesService {
         ahora.getTime() + VENTANA_CONFIRMACION_MIN * 60_000,
       );
 
+      const qr = this.generarQrToken();
+
       const orden = await manager.save(
         manager.create(Orden, {
           numero: this.generarNumero(),
+          qrTokenHash: qr.hash,
           compradorId,
           merchantId: rescate.merchantId,
           status: OrdenStatus.CREADA,
@@ -178,7 +181,16 @@ export class OrdenesService {
         payload: { numero: orden.numero, expiraAt: expiraAt.toISOString() },
       });
 
-      return orden;
+      // El token en claro viaja una sola vez, aquí. No se guarda ni se puede
+      // volver a pedir: si se pierde, la orden se retira por su número con la
+      // verificación manual del comercio.
+      //
+      // El hash se quita explícitamente: `select:false` lo excluye de las
+      // lecturas, pero esta instancia acaba de construirse en memoria y sí lo
+      // lleva puesto.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- descartado a propósito
+      const { qrTokenHash, ...publica } = orden;
+      return { ...publica, qrToken: qr.token };
     });
   }
 
@@ -464,5 +476,22 @@ export class OrdenesService {
       .toUpperCase()
       .slice(0, 8);
     return `R-${fecha}-${sufijo}`;
+  }
+
+  /**
+   * Token de retiro y su hash.
+   *
+   * 32 bytes de aleatoriedad criptográfica: el código autoriza entregar
+   * mercadería, así que adivinarlo tiene que ser inviable, no solo improbable.
+   * Se guarda el hash y se devuelve el original una única vez, igual que se
+   * hace con los tokens de renovación de sesión.
+   */
+  private generarQrToken(): { token: string; hash: string } {
+    const token = crypto.randomBytes(32).toString('base64url');
+    return { token, hash: this.hashQr(token) };
+  }
+
+  private hashQr(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 }

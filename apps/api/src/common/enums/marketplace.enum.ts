@@ -1,3 +1,17 @@
+/**
+ * Los tres tipos de oferta del MVP.
+ *
+ * No es decoración: cambian lo que quien compra puede esperar. En una caja
+ * sorpresa el contenido es deliberadamente desconocido —esa es la gracia y
+ * también el motivo de que no pueda reclamarse por «no era lo que pensaba»—, y
+ * un lote de liquidación se lleva entero, no por unidades.
+ */
+export enum RescateTipo {
+  UNITARIO = 'unitario',
+  CAJA_SORPRESA = 'caja_sorpresa',
+  LOTE = 'lote',
+}
+
 export enum RescateStatus {
   BORRADOR = 'borrador',
   PUBLICADO = 'publicado',

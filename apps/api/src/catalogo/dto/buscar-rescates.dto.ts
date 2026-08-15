@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsEnum,
   IsInt,
   IsLatitude,
   IsLongitude,
@@ -10,6 +11,7 @@ import {
   Min,
 } from 'class-validator';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { RescateTipo } from '../../common/enums/marketplace.enum';
 
 export class BuscarRescatesDto extends PaginationQueryDto {
   /** Coincidencia parcial, sin distinguir mayúsculas, sobre el título. */
@@ -20,6 +22,11 @@ export class BuscarRescatesDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   categoria?: string;
+
+  /** Filtra por clase de oferta: quien busca una caja sorpresa no quiere lotes. */
+  @IsOptional()
+  @IsEnum(RescateTipo)
+  tipo?: RescateTipo;
 
   @IsOptional()
   @IsString()

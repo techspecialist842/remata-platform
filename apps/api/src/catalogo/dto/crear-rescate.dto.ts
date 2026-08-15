@@ -1,17 +1,27 @@
 import { Type } from 'class-transformer';
 import {
   IsDateString,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
   Length,
   Min,
 } from 'class-validator';
+import { RescateTipo } from '../../common/enums/marketplace.enum';
 
 export class CrearRescateDto {
   @IsString()
   @Length(3, 160)
   titulo: string;
+
+  /**
+   * Unitario si no se dice otra cosa, que es el caso corriente y lo que hacían
+   * todas las publicaciones antes de que existiera este campo.
+   */
+  @IsOptional()
+  @IsEnum(RescateTipo)
+  tipo?: RescateTipo;
 
   @IsOptional()
   @IsString()

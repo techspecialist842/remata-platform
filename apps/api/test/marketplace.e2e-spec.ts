@@ -424,6 +424,130 @@ describe('Marketplace (e2e)', () => {
       .expect(403);
   });
 
+  // El código autoriza entregar mercadería, así que lo que se comprueba no es
+  // que exista, sino que no se pueda reconstruir desde nada que la API entregue.
+  it('emite un token de retiro que solo viaja al crear la orden', async () => {
+    const rescateId = await publicarRescate(2, 600, 'qr');
+    const creada = await http()
+      .post('/api/v1/ordenes')
+      .set('Authorization', `Bearer ${compradorToken}`)
+      .set('Idempotency-Key', key('orden-qr'))
+      .send({ rescateId, cantidad: 1 })
+      .expect(201);
+
+    const cuerpo = creada.body as { id: string; qrToken: string };
+    expect(cuerpo.qrToken).toEqual(expect.any(String));
+    // 32 bytes en base64url son 43 caracteres: adivinarlo tiene que ser
+    // inviable, no meramente improbable.
+    expect(cuerpo.qrToken.length).toBeGreaterThanOrEqual(43);
+    expect(creada.body).not.toHaveProperty('qrTokenHash');
+
+    // Y no reaparece en ningún listado, ni al comprador ni al comercio.
+    const mias = await http()
+      .get('/api/v1/ordenes/mias')
+      .set('Authorization', `Bearer ${compradorToken}`)
+      .expect(200);
+    expect(JSON.stringify(mias.body)).not.toContain(cuerpo.qrToken);
+    expect(JSON.stringify(mias.body)).not.toContain('qrTokenHash');
+
+    const recibidas = await http()
+      .get('/api/v1/ordenes/recibidas')
+      .set('Authorization', `Bearer ${comercioToken}`)
+      .expect(200);
+    expect(JSON.stringify(recibidas.body)).not.toContain('qrTokenHash');
+  });
+
+  it('dos órdenes no comparten token de retiro', async () => {
+    const rescateId = await publicarRescate(2, 600, 'qr2');
+    const tokens: string[] = [];
+    for (const k of ['qr2-a', 'qr2-b']) {
+      const r = await http()
+        .post('/api/v1/ordenes')
+        .set('Authorization', `Bearer ${compradorToken}`)
+        .set('Idempotency-Key', key(k))
+        .send({ rescateId, cantidad: 1 })
+        .expect(201);
+      tokens.push((r.body as { qrToken: string }).qrToken);
+    }
+    expect(tokens[0]).not.toBe(tokens[1]);
+  });
+
+  it('clasifica las ofertas por tipo y permite filtrarlas', async () => {
+    const ahora = Date.now();
+    const crearTipo = async (tipo: string, sufijo: string) => {
+      const r = await http()
+        .post('/api/v1/catalogo/rescates')
+        .set('Authorization', `Bearer ${comercioToken}`)
+        .set('Idempotency-Key', key(`tipo-${sufijo}`))
+        .send({
+          titulo: `Tipo ${sufijo} ${runId}`,
+          tipo,
+          precioCentavos: 700,
+          cantidadTotal: 2,
+          validoDesde: new Date(ahora - 60_000).toISOString(),
+          validoHasta: new Date(ahora + 3_600_000).toISOString(),
+        })
+        .expect(201);
+      const id = (r.body as { id: string; tipo: string }).id;
+      expect((r.body as { tipo: string }).tipo).toBe(tipo);
+      await http()
+        .patch(`/api/v1/catalogo/rescates/${id}/publicar`)
+        .set('Authorization', `Bearer ${comercioToken}`)
+        .expect(200);
+      return id;
+    };
+
+    const caja = await crearTipo('caja_sorpresa', 'caja');
+    await crearTipo('lote', 'lote');
+
+    const soloCajas = await http()
+      .get('/api/v1/catalogo/rescates')
+      .query({ q: `Tipo `, tipo: 'caja_sorpresa' })
+      .expect(200);
+    const ids = (soloCajas.body as { items: { id: string }[] }).items.map(
+      (i) => i.id,
+    );
+    expect(ids).toContain(caja);
+    expect(ids).toHaveLength(1);
+  });
+
+  // Todo lo creado antes de que existiera el campo es un artículo suelto; el
+  // default lo clasifica sin tener que tocar una sola fila.
+  it('una oferta sin tipo declarado es unitaria', async () => {
+    const ahora = Date.now();
+    const r = await http()
+      .post('/api/v1/catalogo/rescates')
+      .set('Authorization', `Bearer ${comercioToken}`)
+      .set('Idempotency-Key', key('tipo-defecto'))
+      .send({
+        titulo: `Sin tipo ${runId}`,
+        precioCentavos: 400,
+        cantidadTotal: 1,
+        validoDesde: new Date(ahora - 60_000).toISOString(),
+        validoHasta: new Date(ahora + 3_600_000).toISOString(),
+      })
+      .expect(201);
+
+    expect((r.body as { tipo: string }).tipo).toBe('unitario');
+  });
+
+  it('rechaza un tipo de oferta inventado', async () => {
+    const ahora = Date.now();
+    await http()
+      .post('/api/v1/catalogo/rescates')
+      .set('Authorization', `Bearer ${comercioToken}`)
+      .set('Idempotency-Key', key('tipo-malo'))
+      .send({
+        titulo: `Tipo malo ${runId}`,
+        tipo: 'combo_familiar',
+        precioCentavos: 400,
+        cantidadTotal: 1,
+        validoDesde: new Date(ahora - 60_000).toISOString(),
+        validoHasta: new Date(ahora + 3_600_000).toISOString(),
+      })
+      .expect(400);
+  });
+
   it('impide que un comprador publique rescates (control de rol)', async () => {
     await http()
       .post('/api/v1/catalogo/rescates')

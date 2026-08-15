@@ -8,7 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { LessThan, Repository } from 'typeorm';
 import { Rescate } from '../entities/rescate.entity';
 import { Merchant } from '../entities/merchant.entity';
-import { RescateStatus } from '../common/enums/marketplace.enum';
+import { RescateStatus, RescateTipo } from '../common/enums/marketplace.enum';
 import { AuditLogService } from '../audit/audit-log.service';
 import { CrearRescateDto } from './dto/crear-rescate.dto';
 import { BuscarRescatesDto } from './dto/buscar-rescates.dto';
@@ -145,6 +145,7 @@ export class CatalogoService {
       this.rescates.create({
         merchantId: merchant.id,
         titulo: dto.titulo,
+        tipo: dto.tipo ?? RescateTipo.UNITARIO,
         descripcion: dto.descripcion ?? null,
         categoria: dto.categoria ?? null,
         precioCentavos: dto.precioCentavos,
@@ -241,6 +242,9 @@ export class CatalogoService {
     }
     if (dto.categoria) {
       qb.andWhere('r.categoria = :categoria', { categoria: dto.categoria });
+    }
+    if (dto.tipo) {
+      qb.andWhere('r.tipo = :tipo', { tipo: dto.tipo });
     }
     if (dto.merchantId) {
       qb.andWhere('r.merchant_id = :merchantId', {
