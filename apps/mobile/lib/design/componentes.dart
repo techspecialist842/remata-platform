@@ -199,3 +199,13 @@ String tiempoRestanteTexto(Duration d) {
 
 /// Stock label. Concordancia en singular: "1 disponible", no "1 disponibles".
 String disponiblesTexto(int n) => n == 1 ? '1 disponible' : '$n disponibles';
+
+/// Distancia como la diría una persona.
+///
+/// Por debajo del kilómetro se pasa a metros redondeados a la decena: «a 340 m»
+/// se entiende de un vistazo, «a 0.34 km» obliga a traducir. Y no se fingen
+/// decimales que el GPS no sostiene.
+String distanciaTexto(double km) {
+  if (km < 1) return 'a ${(km * 1000 / 10).round() * 10} m';
+  return 'a ${km.toStringAsFixed(1)} km';
+}

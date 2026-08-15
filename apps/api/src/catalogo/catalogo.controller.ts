@@ -24,11 +24,17 @@ import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { CatalogoService } from './catalogo.service';
 import { CrearRescateDto } from './dto/crear-rescate.dto';
 import { BuscarRescatesDto } from './dto/buscar-rescates.dto';
+import { UbicacionComercioDto } from './dto/ubicacion-comercio.dto';
+import { ReportarRescateDto } from './dto/reportar-rescate.dto';
+import { ReportesService } from './reportes.service';
 
 @ApiTags('catalogo')
 @Controller({ path: 'catalogo', version: '1' })
 export class CatalogoController {
-  constructor(private readonly catalogo: CatalogoService) {}
+  constructor(
+    private readonly catalogo: CatalogoService,
+    private readonly reportes: ReportesService,
+  ) {}
 
   // --- Público: sin autenticación. Es la vitrina del marketplace.
   @Get('rescates')
@@ -49,6 +55,23 @@ export class CatalogoController {
     return this.catalogo.verPublicado(id);
   }
 
+  @Post('rescates/:id/reportar')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Reportar una publicación',
+    description:
+      'No la oculta: la pone en la cola de moderación. Solo un administrador retira, y un reporte por persona y publicación.',
+  })
+  @ApiErrorResponses(400, 401, 404, 409)
+  reportar(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReportarRescateDto,
+  ) {
+    return this.reportes.reportar(user.userId, id, dto.motivo, dto.nota);
+  }
+
   // --- Comercio: su perfil y sus propias publicaciones.
   @Get('mi-comercio')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -62,6 +85,23 @@ export class CatalogoController {
   @ApiErrorResponses(401, 403)
   miComercio(@CurrentUser() user: AuthenticatedUser) {
     return this.catalogo.miComercio(user.userId);
+  }
+
+  @Patch('mi-comercio/ubicacion')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.COMERCIO)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Fijar la dirección y el punto de retiro',
+    description:
+      'Sin coordenadas el comercio sigue vendiendo, pero no aparece en las búsquedas por cercanía.',
+  })
+  @ApiErrorResponses(400, 401, 403)
+  fijarUbicacion(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UbicacionComercioDto,
+  ) {
+    return this.catalogo.fijarUbicacion(user.userId, dto);
   }
 
   @Post('rescates')

@@ -36,6 +36,21 @@ export class Resena {
   @Column({ type: 'text', nullable: true })
   comentario: string | null;
 
+  /**
+   * Réplica del comercio.
+   *
+   * Solo responde el comercio reseñado, y una vez. Poder contestar cambia el
+   * carácter del sistema: una crítica sin derecho a réplica es una sentencia, y
+   * quien lee la ficha merece las dos versiones.
+   *
+   * La respuesta no altera la nota. La calificación es de quien compró.
+   */
+  @Column({ type: 'text', nullable: true })
+  respuesta: string | null;
+
+  @Column({ name: 'respondida_at', type: 'timestamptz', nullable: true })
+  respondidaAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

@@ -9,7 +9,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Merchant } from './merchant.entity';
-import { RescateStatus } from '../common/enums/marketplace.enum';
+import { RescateStatus, RescateTipo } from '../common/enums/marketplace.enum';
 
 // A "rescate" is a merchant's time-limited offer: surplus stock sold at a
 // discount within a window. Money is stored as integer minor units plus a
@@ -30,6 +30,16 @@ export class Rescate {
 
   @Column()
   titulo: string;
+
+  /**
+   * Qué clase de oferta es.
+   *
+   * Por defecto unitario, que es lo que ya existía: las publicaciones creadas
+   * antes de este campo son artículos sueltos, y ese default las deja
+   * correctamente clasificadas sin tener que tocarlas.
+   */
+  @Column({ type: 'enum', enum: RescateTipo, default: RescateTipo.UNITARIO })
+  tipo: RescateTipo;
 
   @Column({ type: 'text', nullable: true })
   descripcion: string | null;

@@ -31,6 +31,36 @@ export class Orden {
   @Column({ name: 'numero' })
   numero: string;
 
+  /**
+   * Token que se codifica en el QR de retiro.
+   *
+   * Se guarda su SHA-256, no el token en claro: quien consiga leer la base de
+   * datos no debe poder fabricar el código que valida un retiro. El token
+   * original se devuelve una sola vez, al crear la orden, y vive solo en el
+   * dispositivo de quien compró.
+   *
+   * Es un secreto aparte del `numero` justamente porque el número está pensado
+   * para decirse en voz alta y aparecer impreso.
+   *
+   * La validación por escaneo llega en Fase 4; esto es la emisión, que el plan
+   * sitúa en Fase 2.
+   */
+  // select:false para que no salga en ningún listado sin pedirlo. Un hash no es
+  // el secreto, pero regalarlo permite probar candidatos sin tocar la API, y no
+  // hay razón para que un cliente lo vea nunca.
+  @Index('IDX_ordenes_qr_token_hash', { unique: true })
+  @Column({
+    name: 'qr_token_hash',
+    type: 'varchar',
+    nullable: true,
+    select: false,
+  })
+  qrTokenHash: string | null;
+
+  /** Cuándo se usó el código. Nulo mientras no se haya retirado. */
+  @Column({ name: 'qr_usado_at', type: 'timestamptz', nullable: true })
+  qrUsadoAt: Date | null;
+
   @Index()
   @Column({ name: 'comprador_id', type: 'uuid' })
   compradorId: string;

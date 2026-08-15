@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import {
   Notification,
   NotificationChannelType,
@@ -42,8 +42,26 @@ export class NotificationsService {
     };
   }
 
-  async enqueue(input: EnqueueNotificationInput): Promise<Notification | null> {
-    const pref = await this.preferences.findOne({
+  /**
+   * Encola una notificación.
+   *
+   * [manager] DEBE pasarse cuando se llama desde dentro de una transacción: sin
+   * él estas dos consultas piden otra conexión del pool mientras la transacción
+   * retiene la suya, y con tanta concurrencia como conexiones haya, todas
+   * quedan esperando una conexión que nadie puede liberar.
+   */
+  async enqueue(
+    input: EnqueueNotificationInput,
+    manager?: EntityManager,
+  ): Promise<Notification | null> {
+    const repoPrefs = manager
+      ? manager.getRepository(NotificationPreference)
+      : this.preferences;
+    const repoNotifs = manager
+      ? manager.getRepository(Notification)
+      : this.notifications;
+
+    const pref = await repoPrefs.findOne({
       where: { userId: input.userId, channel: input.channel },
     });
     if (pref && !pref.enabled) {
@@ -53,7 +71,7 @@ export class NotificationsService {
       return null;
     }
 
-    const notification = this.notifications.create({
+    const notification = repoNotifs.create({
       userId: input.userId,
       channel: input.channel,
       templateKey: input.templateKey,
@@ -61,7 +79,7 @@ export class NotificationsService {
       priority: input.priority ?? NotificationPriority.NORMAL,
       status: NotificationStatus.PENDING,
     });
-    return this.notifications.save(notification);
+    return repoNotifs.save(notification);
   }
 
   async setPreference(

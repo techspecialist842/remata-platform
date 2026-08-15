@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../datos/modelos.dart';
 import '../datos/repositorio.dart';
+import '../datos/ubicacion.dart';
 import '../design/componentes.dart';
 import '../design/tokens.dart';
 
@@ -13,10 +14,12 @@ class PantallaCuentaComercio extends StatefulWidget {
     super.key,
     required this.repo,
     required this.alSalir,
+    this.ubicacion = const ServicioUbicacion(),
   });
 
   final Repositorio repo;
   final VoidCallback alSalir;
+  final ServicioUbicacion ubicacion;
 
   @override
   State<PantallaCuentaComercio> createState() => _PantallaCuentaComercioState();
@@ -35,6 +38,23 @@ class _PantallaCuentaComercioState extends State<PantallaCuentaComercio> {
     setState(() {
       _futuro = widget.repo.miComercioConReputacion();
     });
+  }
+
+  Future<void> _editarUbicacion(Comercio comercio) async {
+    final guardado = await showDialog<bool>(
+      context: context,
+      builder: (_) => _DialogoUbicacion(
+        repo: widget.repo,
+        ubicacion: widget.ubicacion,
+        comercio: comercio,
+      ),
+    );
+    if (guardado == true && mounted) {
+      _recargar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Punto de retiro actualizado')),
+      );
+    }
   }
 
   @override
@@ -66,6 +86,13 @@ class _PantallaCuentaComercioState extends State<PantallaCuentaComercio> {
               padding: const EdgeInsets.all(RTokens.s4),
               children: [
                 _Cabecera(comercio: datos.comercio),
+                const SizedBox(height: RTokens.s5),
+                const Text('Punto de retiro', style: RTokens.titleM),
+                const SizedBox(height: RTokens.s3),
+                _Ubicacion(
+                  comercio: datos.comercio,
+                  alEditar: () => _editarUbicacion(datos.comercio),
+                ),
                 const SizedBox(height: RTokens.s5),
                 const Text('Tu reputación', style: RTokens.titleM),
                 const SizedBox(height: RTokens.s3),
@@ -211,6 +238,249 @@ class _Reputacion extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Estado actual del punto de retiro.
+///
+/// Se dice explícitamente cuando falta: un comercio sin coordenadas desaparece
+/// de las búsquedas por cercanía sin que nada se lo advierta, y esa es
+/// justamente la clase de silencio que hace perder ventas.
+class _Ubicacion extends StatelessWidget {
+  const _Ubicacion({required this.comercio, required this.alEditar});
+
+  final Comercio comercio;
+  final VoidCallback alEditar;
+
+  @override
+  Widget build(BuildContext context) {
+    final ubicado = comercio.apareceEnBusquedasCercanas;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(RTokens.s4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  ubicado ? Icons.place : Icons.location_off_outlined,
+                  color: ubicado ? RTokens.primary : RTokens.textMuted,
+                ),
+                const SizedBox(width: RTokens.s3),
+                Expanded(
+                  child: Text(
+                    comercio.direccion ?? 'Todavía no cargaste tu dirección',
+                    style: comercio.direccion == null
+                        ? RTokens.body.copyWith(color: RTokens.textMuted)
+                        : RTokens.body,
+                  ),
+                ),
+              ],
+            ),
+            if (!ubicado) ...[
+              const SizedBox(height: RTokens.s3),
+              Container(
+                padding: const EdgeInsets.all(RTokens.s3),
+                decoration: BoxDecoration(
+                  color: RTokens.warningSoft,
+                  borderRadius: BorderRadius.circular(RTokens.radiusMd),
+                ),
+                child: Text(
+                  'Sin ubicación no aparecés cuando alguien busca ofertas cerca '
+                  'suyo. Tus publicaciones se siguen vendiendo igual.',
+                  style: RTokens.bodySm.copyWith(color: RTokens.warning),
+                ),
+              ),
+            ],
+            const SizedBox(height: RTokens.s3),
+            OutlinedButton.icon(
+              onPressed: alEditar,
+              icon: const Icon(Icons.edit_location_alt_outlined, size: 18),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+              ),
+              label: Text(ubicado ? 'Cambiar ubicación' : 'Fijar ubicación'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Alta o cambio del punto de retiro.
+///
+/// La dirección se escribe; las coordenadas se toman del propio dispositivo,
+/// que es lo correcto porque quien las fija está de pie en el local. No se
+/// piden a mano: nadie sabe su latitud de memoria, y teclearla es una fuente de
+/// errores que dejaría al comercio ubicado en el mar.
+class _DialogoUbicacion extends StatefulWidget {
+  const _DialogoUbicacion({
+    required this.repo,
+    required this.ubicacion,
+    required this.comercio,
+  });
+
+  final Repositorio repo;
+  final ServicioUbicacion ubicacion;
+  final Comercio comercio;
+
+  @override
+  State<_DialogoUbicacion> createState() => _DialogoUbicacionState();
+}
+
+class _DialogoUbicacionState extends State<_DialogoUbicacion> {
+  late final _direccion =
+      TextEditingController(text: widget.comercio.direccion ?? '');
+  Coordenada? _punto;
+  bool _ubicando = false;
+  bool _guardando = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final lat = widget.comercio.latitud;
+    final lng = widget.comercio.longitud;
+    if (lat != null && lng != null) _punto = Coordenada(lat, lng);
+
+    // Sin esto, «Guardar» decide si habilitarse leyendo el texto en el momento
+    // de construir, y escribir no reconstruye nada: quien escribiera su
+    // dirección vería el botón apagado y creería que la app está rota.
+    _direccion.addListener(_alEscribir);
+  }
+
+  void _alEscribir() => setState(() {});
+
+  @override
+  void dispose() {
+    _direccion.removeListener(_alEscribir);
+    _direccion.dispose();
+    super.dispose();
+  }
+
+  Future<void> _tomarUbicacion() async {
+    setState(() {
+      _ubicando = true;
+      _error = null;
+    });
+    try {
+      final p = await widget.ubicacion.actual();
+      if (!mounted) return;
+      setState(() {
+        _punto = p;
+        _ubicando = false;
+      });
+    } on UbicacionExcepcion catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.mensaje;
+        _ubicando = false;
+      });
+    }
+  }
+
+  Future<void> _guardar() async {
+    setState(() {
+      _guardando = true;
+      _error = null;
+    });
+    try {
+      await widget.repo.fijarUbicacion(
+        direccion: _direccion.text,
+        punto: _punto,
+      );
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = '$e';
+        _guardando = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(RTokens.radiusLg),
+      ),
+      title: const Text('Punto de retiro'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _direccion,
+            maxLines: 2,
+            decoration: const InputDecoration(
+              labelText: 'Dirección',
+              hintText: 'Calle, número, referencia',
+            ),
+          ),
+          const SizedBox(height: RTokens.s3),
+          if (_punto != null)
+            Row(
+              children: [
+                const Icon(Icons.check_circle,
+                    color: RTokens.success, size: 18),
+                const SizedBox(width: RTokens.s2),
+                Expanded(
+                  child: Text(
+                    'Ubicación tomada',
+                    style: RTokens.bodySm.copyWith(color: RTokens.success),
+                  ),
+                ),
+              ],
+            ),
+          const SizedBox(height: RTokens.s2),
+          OutlinedButton.icon(
+            onPressed: _ubicando ? null : _tomarUbicacion,
+            icon: _ubicando
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.my_location, size: 18),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+            ),
+            label: Text(
+              _punto == null
+                  ? 'Usar mi ubicación actual'
+                  : 'Volver a tomarla',
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: RTokens.s3),
+            Text(
+              _error!,
+              style: RTokens.bodySm.copyWith(color: RTokens.danger),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        TextButton(
+          // Se puede guardar solo la dirección: tenerla escrita es mejor que
+          // nada mientras se consigue la ubicación. Lo que no tiene sentido es
+          // guardar el diálogo entero vacío.
+          onPressed: _guardando ||
+                  (_direccion.text.trim().isEmpty && _punto == null)
+              ? null
+              : _guardar,
+          child: const Text('Guardar'),
+        ),
+      ],
     );
   }
 }

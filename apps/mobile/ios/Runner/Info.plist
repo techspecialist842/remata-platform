@@ -2,6 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!--
+	  iOS enseña este texto literalmente en el diálogo de permiso, así que dice
+	  para qué se usa la ubicación, no que se necesita. «WhenInUse» y no
+	  «Always»: solo hace falta mientras alguien está mirando el catálogo.
+	-->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>REMATA usa tu ubicación para mostrarte las ofertas de comercios cercanos.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

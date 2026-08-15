@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../datos/api.dart';
 import '../datos/repositorio.dart';
 import '../design/tokens.dart';
-import '../datos/modelos.dart' show monedaPorDefecto;
+import '../datos/modelos.dart';
 
 /// Alta de un rescate.
 ///
@@ -44,6 +44,7 @@ class _PantallaNuevaPublicacionState extends State<PantallaNuevaPublicacion> {
   final _precioOriginal = TextEditingController();
   final _cantidad = TextEditingController(text: '1');
 
+  TipoOferta _tipo = TipoOferta.unitario;
   DateTime _validoHasta = DateTime.now().add(const Duration(hours: 6));
   bool _guardando = false;
   String? _error;
@@ -100,6 +101,7 @@ class _PantallaNuevaPublicacionState extends State<PantallaNuevaPublicacion> {
     try {
       await widget.repo.crearRescate(
         titulo: _titulo.text.trim(),
+        tipo: _tipo,
         descripcion: _descripcion.text.trim(),
         categoria: _categoria.text.trim(),
         precioCentavos: aCentavos(_precio.text)!,
@@ -154,6 +156,25 @@ class _PantallaNuevaPublicacionState extends State<PantallaNuevaPublicacion> {
                 return null;
               },
             ),
+            const SizedBox(height: RTokens.s4),
+            const Text('Qué clase de oferta es', style: RTokens.titleM),
+            const SizedBox(height: RTokens.s2),
+            SegmentedButton<TipoOferta>(
+              segments: [
+                for (final t in TipoOferta.values)
+                  ButtonSegment(value: t, label: Text(t.etiqueta)),
+              ],
+              selected: {_tipo},
+              onSelectionChanged: (s) => setState(() => _tipo = s.first),
+            ),
+            const SizedBox(height: RTokens.s2),
+            // Se explica al elegir, no después: el tipo cambia lo que quien
+            // compra puede esperar, y el comercio debe saber qué está firmando.
+            Text(
+              _tipo.explicacion,
+              style: RTokens.bodySm.copyWith(color: RTokens.textMuted),
+            ),
+
             const SizedBox(height: RTokens.s3),
             TextFormField(
               controller: _descripcion,

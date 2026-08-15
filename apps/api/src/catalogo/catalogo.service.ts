@@ -8,13 +8,40 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { LessThan, Repository } from 'typeorm';
 import { Rescate } from '../entities/rescate.entity';
 import { Merchant } from '../entities/merchant.entity';
-import { RescateStatus } from '../common/enums/marketplace.enum';
+import { RescateStatus, RescateTipo } from '../common/enums/marketplace.enum';
 import { AuditLogService } from '../audit/audit-log.service';
 import { CrearRescateDto } from './dto/crear-rescate.dto';
 import { BuscarRescatesDto } from './dto/buscar-rescates.dto';
+import { UbicacionComercioDto } from './dto/ubicacion-comercio.dto';
+
+/** Un grado de latitud son ~111 km en cualquier punto del planeta. */
+const KM_POR_GRADO_LAT = 111.32;
+
+/** Radio asumido cuando se pide cercanía sin decir cuánta. */
+const RADIO_KM_POR_DEFECTO = 5;
+
+/**
+ * Distancia en kilómetros entre el punto buscado y el comercio.
+ *
+ * Haversine sobre una esfera de radio medio. El error frente al elipsoide real
+ * es de hasta un 0,5%, que a 5 km son 25 metros: irrelevante para decidir si
+ * una panadería queda cerca, y a cambio es una sola expresión SQL sin
+ * extensiones ni dependencias.
+ */
+const HAVERSINE_KM = `(
+  6371 * acos(
+    least(1, greatest(-1,
+      cos(radians(:lat)) * cos(radians(m.latitud))
+        * cos(radians(m.longitud) - radians(:lng))
+      + sin(radians(:lat)) * sin(radians(m.latitud))
+    ))
+  )
+)`;
 
 export interface PaginatedRescates {
-  items: Rescate[];
+  // La distancia solo viaja cuando se buscó por cercanía; en el resto de
+  // búsquedas no existe y sería mentira devolver un cero.
+  items: (Rescate | (Rescate & { distanciaKm: number }))[];
   total: number;
   page: number;
   pageSize: number;
@@ -29,7 +56,6 @@ export class CatalogoService {
     private readonly audit: AuditLogService,
   ) {}
 
-  /** Resolves the merchant profile for a user, or fails if they have none. */
   /**
    * El perfil comercial de quien llama.
    *
@@ -41,6 +67,51 @@ export class CatalogoService {
     return this.merchantDe(userId);
   }
 
+  /**
+   * Fija la dirección y el punto de retiro.
+   *
+   * Sin coordenadas el comercio sigue vendiendo, solo que no aparece en las
+   * búsquedas por cercanía. Por eso se permite guardar solo la dirección: es
+   * mejor que la tenga escrita a que no tenga nada mientras consigue las
+   * coordenadas.
+   */
+  async fijarUbicacion(
+    userId: string,
+    dto: UbicacionComercioDto,
+  ): Promise<Merchant> {
+    const merchant = await this.merchantDe(userId);
+
+    const dioLat = dto.latitud !== undefined;
+    const dioLng = dto.longitud !== undefined;
+    if (dioLat !== dioLng) {
+      throw new BadRequestException(
+        'La latitud y la longitud se guardan juntas',
+      );
+    }
+
+    if (dto.direccion !== undefined) merchant.direccion = dto.direccion;
+    if (dioLat) {
+      merchant.latitud = dto.latitud!;
+      merchant.longitud = dto.longitud!;
+    }
+
+    await this.merchants.save(merchant);
+
+    await this.audit.record({
+      actorUserId: userId,
+      action: 'catalogo.comercio.ubicacion',
+      targetType: 'merchant',
+      targetId: merchant.id,
+      // Las coordenadas quedan en la auditoría: ubican un local, que es dato
+      // público del comercio, y permiten reconstruir por qué apareció o dejó de
+      // aparecer en una búsqueda.
+      metadata: { latitud: merchant.latitud, longitud: merchant.longitud },
+    });
+
+    return merchant;
+  }
+
+  /** Resolves the merchant profile for a user, or fails if they have none. */
   private async merchantDe(userId: string): Promise<Merchant> {
     const merchant = await this.merchants.findOne({ where: { userId } });
     if (!merchant) {
@@ -74,6 +145,7 @@ export class CatalogoService {
       this.rescates.create({
         merchantId: merchant.id,
         titulo: dto.titulo,
+        tipo: dto.tipo ?? RescateTipo.UNITARIO,
         descripcion: dto.descripcion ?? null,
         categoria: dto.categoria ?? null,
         precioCentavos: dto.precioCentavos,
@@ -171,6 +243,9 @@ export class CatalogoService {
     if (dto.categoria) {
       qb.andWhere('r.categoria = :categoria', { categoria: dto.categoria });
     }
+    if (dto.tipo) {
+      qb.andWhere('r.tipo = :tipo', { tipo: dto.tipo });
+    }
     if (dto.merchantId) {
       qb.andWhere('r.merchant_id = :merchantId', {
         merchantId: dto.merchantId,
@@ -180,13 +255,83 @@ export class CatalogoService {
       qb.andWhere('r.precio_centavos <= :max', { max: dto.precioMaxCentavos });
     }
 
-    const [items, total] = await qb
-      .orderBy('r.valido_hasta', 'ASC') // los que vencen antes, primero
-      .skip((page - 1) * pageSize)
-      .take(pageSize)
-      .getManyAndCount();
+    const cerca = this.puntoDeBusqueda(dto);
+    if (cerca) {
+      // Se une con el comercio porque el punto de retiro vive en él: un rescate
+      // se recoge en el local, no en una coordenada propia.
+      qb.innerJoin('merchants', 'm', 'm.id = r.merchant_id')
+        .andWhere('m.latitud IS NOT NULL')
+        .andWhere('m.longitud IS NOT NULL');
 
+      // Prefiltro por caja delimitadora antes de calcular distancias. Es lo que
+      // permite que el índice (latitud, longitud) haga algo: comparar rangos es
+      // indexable, calcular haversine sobre cada fila no lo es.
+      const gradosLat = cerca.radioKm / KM_POR_GRADO_LAT;
+      const gradosLng =
+        cerca.radioKm /
+        (KM_POR_GRADO_LAT * Math.cos((cerca.lat * Math.PI) / 180));
+
+      qb.andWhere('m.latitud BETWEEN :latMin AND :latMax', {
+        latMin: cerca.lat - gradosLat,
+        latMax: cerca.lat + gradosLat,
+      }).andWhere('m.longitud BETWEEN :lngMin AND :lngMax', {
+        lngMin: cerca.lng - gradosLng,
+        lngMax: cerca.lng + gradosLng,
+      });
+
+      // Y ahora sí la distancia real sobre las pocas filas que quedaron. La
+      // caja es un cuadrado y el radio un círculo: sin esto entrarían las
+      // esquinas, hasta un 41% más lejos de lo pedido.
+      qb.andWhere(`${HAVERSINE_KM} <= :radioKm`, {
+        lat: cerca.lat,
+        lng: cerca.lng,
+        radioKm: cerca.radioKm,
+      });
+
+      qb.addSelect(HAVERSINE_KM, 'distancia_km');
+    }
+
+    // Buscando por cercanía manda la distancia; si no, vence antes lo que
+    // primero caduca, que es de lo que trata esta aplicación.
+    if (cerca) {
+      qb.orderBy('distancia_km', 'ASC').addOrderBy('r.valido_hasta', 'ASC');
+    } else {
+      qb.orderBy('r.valido_hasta', 'ASC');
+    }
+
+    qb.skip((page - 1) * pageSize).take(pageSize);
+
+    // getManyAndCount descartaría la distancia: no es columna de la entidad.
+    // getRawAndEntities devuelve ambas cosas y se emparejan por posición.
+    const total = await qb.getCount();
+    if (!cerca) {
+      return { items: await qb.getMany(), total, page, pageSize };
+    }
+
+    const { entities, raw } = await qb.getRawAndEntities<{
+      distancia_km: string;
+    }>();
+    const items = entities.map((r, i) => ({
+      ...r,
+      distanciaKm: Math.round(Number(raw[i].distancia_km) * 100) / 100,
+    }));
     return { items, total, page, pageSize };
+  }
+
+  /** Las tres coordenadas van juntas o no hay búsqueda por cercanía. */
+  private puntoDeBusqueda(
+    dto: BuscarRescatesDto,
+  ): { lat: number; lng: number; radioKm: number } | null {
+    const { lat, lng, radioKm } = dto;
+    if (lat === undefined && lng === undefined && radioKm === undefined) {
+      return null;
+    }
+    if (lat === undefined || lng === undefined) {
+      throw new BadRequestException(
+        'Para buscar por cercanía hacen falta lat y lng',
+      );
+    }
+    return { lat, lng, radioKm: radioKm ?? RADIO_KM_POR_DEFECTO };
   }
 
   async verPublicado(id: string): Promise<Rescate> {

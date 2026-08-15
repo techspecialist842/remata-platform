@@ -28,8 +28,17 @@ import { CuponesService } from './cupones.service';
 import { ReputacionService } from './reputacion.service';
 import { CrearOrdenDto } from './dto/crear-orden.dto';
 
-/** Minutes a buyer has to be confirmed by the merchant before the order lapses. */
-const VENTANA_CONFIRMACION_MIN = 30;
+/**
+ * Minutos que el comercio tiene para confirmar antes de que la reserva caduque
+ * y las unidades vuelvan al catálogo.
+ *
+ * El plan fija la retención de inventario entre 5 y 15 minutos; se toma el
+ * extremo alto para no apretar de más a un comercio ocupado en mostrador. La
+ * cifra es deliberadamente corta: cada minuto que una unidad está retenida es
+ * un minuto que nadie más puede comprarla, y estas ofertas vencen el mismo día.
+ *
+ */
+const VENTANA_CONFIRMACION_MIN = 15;
 
 // Allowed transitions. Everything not listed here is rejected, so an invalid
 // move fails loudly instead of silently corrupting an order's history.
@@ -39,6 +48,14 @@ const TRANSICIONES: Record<OrdenStatus, OrdenStatus[]> = {
   [OrdenStatus.CUMPLIDA]: [],
   [OrdenStatus.CANCELADA]: [],
 };
+
+/**
+ * Lo que devuelve crear(): la orden sin el hash del código, más el token en
+ * claro. El tipo lo dice explícitamente para que no se pueda devolver el hash
+ * por descuido — omitirlo es parte del contrato, no un detalle de la
+ * implementación.
+ */
+export type OrdenCreada = Omit<Orden, 'qrTokenHash'> & { qrToken: string };
 
 @Injectable()
 export class OrdenesService {
@@ -54,7 +71,7 @@ export class OrdenesService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  async crear(compradorId: string, dto: CrearOrdenDto): Promise<Orden> {
+  async crear(compradorId: string, dto: CrearOrdenDto): Promise<OrdenCreada> {
     return this.dataSource.transaction(async (manager) => {
       const rescate = await manager.findOne(Rescate, {
         where: { id: dto.rescateId },
@@ -64,6 +81,20 @@ export class OrdenesService {
       }
 
       const ahora = new Date();
+
+      // Agotado es un conflicto de estado, no una petición mal formada, y sobre
+      // todo es exactamente lo mismo que le pasa a quien pierde la reserva
+      // atómica de abajo. Bajo concurrencia unos leen «agotado» y otros pierden
+      // la carrera; devolverles códigos distintos por una diferencia de
+      // microsegundos haría que el cliente mostrara dos mensajes para el mismo
+      // hecho: alguien se adelantó.
+      if (
+        rescate.status === RescateStatus.AGOTADO ||
+        rescate.cantidadDisponible < dto.cantidad
+      ) {
+        throw new ConflictException('No hay unidades suficientes disponibles');
+      }
+
       if (
         rescate.status !== RescateStatus.PUBLICADO ||
         rescate.validoDesde > ahora ||
@@ -113,9 +144,12 @@ export class OrdenesService {
         ahora.getTime() + VENTANA_CONFIRMACION_MIN * 60_000,
       );
 
+      const qr = this.generarQrToken();
+
       const orden = await manager.save(
         manager.create(Orden, {
           numero: this.generarNumero(),
+          qrTokenHash: qr.hash,
           compradorId,
           merchantId: rescate.merchantId,
           status: OrdenStatus.CREADA,
@@ -153,23 +187,41 @@ export class OrdenesService {
         .andWhere('status = :publicado', { publicado: RescateStatus.PUBLICADO })
         .execute();
 
-      await this.audit.record({
-        actorUserId: compradorId,
-        action: 'ordenes.orden.creada',
-        targetType: 'orden',
-        targetId: orden.id,
-        metadata: { rescateId: rescate.id, totalCentavos: orden.totalCentavos },
-      });
+      await this.audit.record(
+        {
+          actorUserId: compradorId,
+          action: 'ordenes.orden.creada',
+          targetType: 'orden',
+          targetId: orden.id,
+          metadata: {
+            rescateId: rescate.id,
+            totalCentavos: orden.totalCentavos,
+          },
+        },
+        manager,
+      );
 
-      await this.notifications.enqueue({
-        userId: compradorId,
-        channel: NotificationChannelType.EMAIL,
-        templateKey: 'ordenes.creada',
-        priority: NotificationPriority.NORMAL,
-        payload: { numero: orden.numero, expiraAt: expiraAt.toISOString() },
-      });
+      await this.notifications.enqueue(
+        {
+          userId: compradorId,
+          channel: NotificationChannelType.EMAIL,
+          templateKey: 'ordenes.creada',
+          priority: NotificationPriority.NORMAL,
+          payload: { numero: orden.numero, expiraAt: expiraAt.toISOString() },
+        },
+        manager,
+      );
 
-      return orden;
+      // El token en claro viaja una sola vez, aquí. No se guarda ni se puede
+      // volver a pedir: si se pierde, la orden se retira por su número con la
+      // verificación manual del comercio.
+      //
+      // El hash se quita explícitamente: `select:false` lo excluye de las
+      // lecturas, pero esta instancia acaba de construirse en memoria y sí lo
+      // lleva puesto.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- descartado a propósito
+      const { qrTokenHash, ...publica } = orden;
+      return { ...publica, qrToken: qr.token };
     });
   }
 
@@ -266,21 +318,27 @@ export class OrdenesService {
 
       await this.liberar(manager, orden, motivo, nota ?? null);
 
-      await this.audit.record({
-        actorUserId: userId,
-        action: 'ordenes.orden.cancelada',
-        targetType: 'orden',
-        targetId: orden.id,
-        metadata: { motivo },
-      });
+      await this.audit.record(
+        {
+          actorUserId: userId,
+          action: 'ordenes.orden.cancelada',
+          targetType: 'orden',
+          targetId: orden.id,
+          metadata: { motivo },
+        },
+        manager,
+      );
 
-      await this.notifications.enqueue({
-        userId: esComprador ? orden.merchantId : orden.compradorId,
-        channel: NotificationChannelType.EMAIL,
-        templateKey: 'ordenes.cancelada',
-        priority: NotificationPriority.HIGH,
-        payload: { numero: orden.numero, motivo },
-      });
+      await this.notifications.enqueue(
+        {
+          userId: esComprador ? orden.merchantId : orden.compradorId,
+          channel: NotificationChannelType.EMAIL,
+          templateKey: 'ordenes.cancelada',
+          priority: NotificationPriority.HIGH,
+          payload: { numero: orden.numero, motivo },
+        },
+        manager,
+      );
 
       return orden;
     });
@@ -455,5 +513,22 @@ export class OrdenesService {
       .toUpperCase()
       .slice(0, 8);
     return `R-${fecha}-${sufijo}`;
+  }
+
+  /**
+   * Token de retiro y su hash.
+   *
+   * 32 bytes de aleatoriedad criptográfica: el código autoriza entregar
+   * mercadería, así que adivinarlo tiene que ser inviable, no solo improbable.
+   * Se guarda el hash y se devuelve el original una única vez, igual que se
+   * hace con los tokens de renovación de sesión.
+   */
+  private generarQrToken(): { token: string; hash: string } {
+    const token = crypto.randomBytes(32).toString('base64url');
+    return { token, hash: this.hashQr(token) };
+  }
+
+  private hashQr(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 }

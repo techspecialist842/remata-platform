@@ -26,6 +26,7 @@ import { ResenasService } from './resenas.service';
 import { ReputacionService } from './reputacion.service';
 import { CrearOrdenDto } from './dto/crear-orden.dto';
 import { CancelarOrdenDto, CrearResenaDto } from './dto/acciones-orden.dto';
+import { ResponderResenaDto } from './dto/responder-resena.dto';
 
 @ApiTags('ordenes')
 @ApiBearerAuth()
@@ -133,6 +134,22 @@ export class OrdenesController {
     @Body() dto: CancelarOrdenDto,
   ) {
     return this.ordenes.cancelar(user.userId, id, dto.motivo, dto.nota);
+  }
+
+  @Post('resenas/:id/responder')
+  @Roles(Role.COMERCIO)
+  @ApiOperation({
+    summary: 'Responder a una reseña',
+    description:
+      'Solo el comercio reseñado, y una sola vez. No altera la nota: la calificación es de quien compró.',
+  })
+  @ApiErrorResponses(400, 404, 409)
+  responderResena(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ResponderResenaDto,
+  ) {
+    return this.resenas.responder(user.userId, id, dto.texto);
   }
 
   @Get('reputacion/:sujetoId')
