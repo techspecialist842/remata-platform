@@ -26,6 +26,7 @@ import { ApiErrorResponses } from '../common/decorators/api-error-responses.deco
 import { SetUserActiveDto } from './dto/set-user-active.dto';
 import { RetirarRescateDto } from './dto/moderar-rescate.dto';
 import { ModeracionService } from './moderacion.service';
+import { ReportesService } from '../catalogo/reportes.service';
 import { OrdenStatus, RescateStatus } from '../common/enums/marketplace.enum';
 
 @ApiTags('admin')
@@ -38,6 +39,7 @@ export class AdminController {
   constructor(
     private readonly admin: AdminService,
     private readonly moderacion: ModeracionService,
+    private readonly reportes: ReportesService,
   ) {}
 
   @Post('admins')
@@ -86,6 +88,31 @@ export class AdminController {
     @Query('status') status?: RescateStatus,
   ) {
     return this.moderacion.listarRescates(status, query.page, query.pageSize);
+  }
+
+  @Get('reportes')
+  @ApiOperation({
+    summary: 'Cola de moderación',
+    description:
+      'Publicaciones con reportes sin revisar, la más denunciada primero. Se agrupa por publicación: diez reportes sobre lo mismo son una decisión, no diez.',
+  })
+  @ApiErrorResponses(400)
+  colaModeracion(@Query() query: PaginationQueryDto) {
+    return this.reportes.cola(query.page, query.pageSize);
+  }
+
+  @Patch('reportes/:rescateId/descartar')
+  @ApiOperation({
+    summary: 'Descartar los reportes de una publicación',
+    description:
+      'La saca de la cola sin retirarla: se revisó y no había motivo.',
+  })
+  @ApiErrorResponses(404)
+  descartarReportes(
+    @Param('rescateId', ParseUUIDPipe) rescateId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.reportes.descartar(user.userId, rescateId);
   }
 
   @Patch('rescates/:id/retirar')

@@ -9,12 +9,14 @@ import { Rescate } from '../entities/rescate.entity';
 import { Orden } from '../entities/orden.entity';
 import { RescateStatus, OrdenStatus } from '../common/enums/marketplace.enum';
 import { AuditLogService } from '../audit/audit-log.service';
+import { ReportesService } from '../catalogo/reportes.service';
 
 @Injectable()
 export class ModeracionService {
   constructor(
     @InjectRepository(Rescate) private readonly rescates: Repository<Rescate>,
     @InjectRepository(Orden) private readonly ordenes: Repository<Orden>,
+    private readonly reportes: ReportesService,
     private readonly audit: AuditLogService,
   ) {}
 
@@ -51,12 +53,19 @@ export class ModeracionService {
     rescate.motivoModeracion = motivo;
     await this.rescates.save(rescate);
 
+    // Retirar resuelve la denuncia: sin esto la publicación seguiría en la cola
+    // para siempre, y la cola dejaría de significar «pendiente de mirar».
+    const reportesCerrados = await this.reportes.marcarRevisados(
+      adminId,
+      rescate.id,
+    );
+
     await this.audit.record({
       actorUserId: adminId,
       action: 'moderacion.rescate.retirado',
       targetType: 'rescate',
       targetId: rescate.id,
-      metadata: { motivo, merchantId: rescate.merchantId },
+      metadata: { motivo, merchantId: rescate.merchantId, reportesCerrados },
     });
 
     return rescate;

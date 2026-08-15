@@ -11,6 +11,7 @@ import { OrdenItem } from '../entities/orden-item.entity';
 import { Cupon } from '../entities/cupon.entity';
 import { Resena } from '../entities/resena.entity';
 import { Reputacion } from '../entities/reputacion.entity';
+import { Reporte } from '../entities/reporte.entity';
 
 // Single source of truth for the entity list, shared by the runtime DatabaseModule
 // and the CLI DataSource used to generate/run migrations — keeps them from drifting.
@@ -30,4 +31,5 @@ export const ENTITIES = [
   Cupon,
   Resena,
   Reputacion,
+  Reporte,
 ];

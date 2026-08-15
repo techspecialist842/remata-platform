@@ -25,11 +25,16 @@ import { CatalogoService } from './catalogo.service';
 import { CrearRescateDto } from './dto/crear-rescate.dto';
 import { BuscarRescatesDto } from './dto/buscar-rescates.dto';
 import { UbicacionComercioDto } from './dto/ubicacion-comercio.dto';
+import { ReportarRescateDto } from './dto/reportar-rescate.dto';
+import { ReportesService } from './reportes.service';
 
 @ApiTags('catalogo')
 @Controller({ path: 'catalogo', version: '1' })
 export class CatalogoController {
-  constructor(private readonly catalogo: CatalogoService) {}
+  constructor(
+    private readonly catalogo: CatalogoService,
+    private readonly reportes: ReportesService,
+  ) {}
 
   // --- Público: sin autenticación. Es la vitrina del marketplace.
   @Get('rescates')
@@ -48,6 +53,23 @@ export class CatalogoController {
   @ApiErrorResponses(404)
   ver(@Param('id', ParseUUIDPipe) id: string) {
     return this.catalogo.verPublicado(id);
+  }
+
+  @Post('rescates/:id/reportar')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Reportar una publicación',
+    description:
+      'No la oculta: la pone en la cola de moderación. Solo un administrador retira, y un reporte por persona y publicación.',
+  })
+  @ApiErrorResponses(400, 401, 404, 409)
+  reportar(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReportarRescateDto,
+  ) {
+    return this.reportes.reportar(user.userId, id, dto.motivo, dto.nota);
   }
 
   // --- Comercio: su perfil y sus propias publicaciones.

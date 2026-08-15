@@ -12,6 +12,21 @@ export enum RescateTipo {
   LOTE = 'lote',
 }
 
+/**
+ * Por qué alguien denuncia una publicación.
+ *
+ * La lista es corta a propósito: un desplegable de veinte motivos hace que
+ * nadie reporte, y los que reportan eligen mal. «Otro» recoge lo demás con la
+ * nota escrita a mano.
+ */
+export enum ReporteMotivo {
+  ENGANOSO = 'enganoso', // no es lo que dice ser
+  PRECIO_INCORRECTO = 'precio_incorrecto',
+  INSEGURO = 'inseguro', // producto en mal estado o riesgoso
+  NO_DISPONIBLE = 'no_disponible', // el comercio no lo tiene
+  OTRO = 'otro',
+}
+
 export enum RescateStatus {
   BORRADOR = 'borrador',
   PUBLICADO = 'publicado',

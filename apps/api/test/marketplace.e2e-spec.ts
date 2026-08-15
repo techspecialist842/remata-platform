@@ -498,17 +498,21 @@ describe('Marketplace (e2e)', () => {
     };
 
     const caja = await crearTipo('caja_sorpresa', 'caja');
-    await crearTipo('lote', 'lote');
+    const lote = await crearTipo('lote', 'lote');
 
+    // Acotado por runId: la base persiste entre ejecuciones y un `q` genérico
+    // recogería las publicaciones de corridas anteriores.
     const soloCajas = await http()
       .get('/api/v1/catalogo/rescates')
-      .query({ q: `Tipo `, tipo: 'caja_sorpresa' })
+      .query({ q: `${runId}`, tipo: 'caja_sorpresa' })
       .expect(200);
     const ids = (soloCajas.body as { items: { id: string }[] }).items.map(
       (i) => i.id,
     );
+
     expect(ids).toContain(caja);
-    expect(ids).toHaveLength(1);
+    // Lo que de verdad se comprueba: el filtro deja fuera los otros tipos.
+    expect(ids).not.toContain(lote);
   });
 
   // Todo lo creado antes de que existiera el campo es un artículo suelto; el
