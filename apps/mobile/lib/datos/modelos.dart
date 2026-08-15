@@ -44,6 +44,7 @@ class Rescate {
     required this.estado,
     required this.validoDesde,
     required this.validoHasta,
+    this.distanciaKm,
   });
 
   final String id;
@@ -58,6 +59,9 @@ class Rescate {
   final EstadoRescate estado;
   final DateTime validoDesde;
   final DateTime validoHasta;
+
+  /// Solo llega cuando se buscó por cercanía; nula en el resto de búsquedas.
+  final double? distanciaKm;
 
   /// Unidades ya comprometidas. El comercio necesita saberlo antes de pausar:
   /// pausar no cancela las reservas que ya existen.
@@ -88,6 +92,7 @@ class Rescate {
             ? DateTime.now()
             : DateTime.parse(j['validoDesde'] as String).toLocal(),
         validoHasta: DateTime.parse(j['validoHasta'] as String).toLocal(),
+        distanciaKm: _aDouble(j['distanciaKm']),
       );
 }
 
@@ -207,18 +212,40 @@ class Comercio {
     required this.id,
     required this.nombreLegal,
     required this.verificado,
+    required this.direccion,
+    required this.latitud,
+    required this.longitud,
   });
 
   final String id;
   final String nombreLegal;
   final bool verificado;
+  final String? direccion;
+  final double? latitud;
+  final double? longitud;
+
+  /// Sin coordenadas el comercio vende igual, pero no sale en las búsquedas
+  /// por cercanía. Conviene decírselo.
+  bool get apareceEnBusquedasCercanas => latitud != null && longitud != null;
 
   factory Comercio.desdeJson(Map<String, dynamic> j) => Comercio(
         id: j['id'] as String,
         nombreLegal: j['legalName'] as String,
         verificado: (j['isVerified'] as bool?) ?? false,
+        direccion: j['direccion'] as String?,
+        // La API las manda como numeric, que viaja en JSON como número o como
+        // cadena según el driver; se acepta cualquiera de las dos formas.
+        latitud: _aDouble(j['latitud']),
+        longitud: _aDouble(j['longitud']),
       );
 }
+
+double? _aDouble(dynamic v) => switch (v) {
+      null => null,
+      num n => n.toDouble(),
+      String s => double.tryParse(s),
+      _ => null,
+    };
 
 /// Reputación acumulada de un comercio o de un comprador.
 class Reputacion {

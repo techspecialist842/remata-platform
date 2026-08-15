@@ -1,4 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      Ubicación para mostrar las ofertas cercanas. Se piden las dos precisiones:
+      con COARSE alcanza para decidir qué comercio queda cerca, y Android 12 y
+      posteriores dejan que la persona conceda solo la aproximada. Pedir FINE a
+      secas obligaría a un permiso más invasivo del necesario.
+
+      No se pide ACCESS_BACKGROUND_LOCATION: la app solo necesita la ubicación
+      mientras alguien la está usando.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+
     <application
         android:label="remata_movil"
         android:name="${applicationName}"

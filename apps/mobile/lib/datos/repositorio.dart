@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'api.dart';
 import 'modelos.dart';
+import 'ubicacion.dart';
 
 /// Screens talk to this, never to ApiCliente directly, so route strings and
 /// JSON shapes stay in one layer.
@@ -68,9 +69,13 @@ class Repositorio {
 
   // --- Catálogo ---
 
+  /// [cerca] activa la búsqueda por cercanía: los resultados llegan con su
+  /// distancia y ordenados por ella, en vez de por vencimiento.
   Future<Pagina<Rescate>> buscarRescates({
     String? q,
     String? categoria,
+    Coordenada? cerca,
+    double radioKm = 5,
     int pagina = 1,
   }) async {
     final r = await api.get('/api/v1/catalogo/rescates', query: {
@@ -78,6 +83,11 @@ class Repositorio {
       'pageSize': '20',
       if (q != null && q.isNotEmpty) 'q': q,
       if (categoria != null && categoria.isNotEmpty) 'categoria': categoria,
+      if (cerca != null) ...{
+        'lat': '${cerca.lat}',
+        'lng': '${cerca.lng}',
+        'radioKm': '$radioKm',
+      },
     }) as Map<String, dynamic>;
     return Pagina.desdeJson(r, Rescate.desdeJson);
   }
@@ -205,6 +215,23 @@ class Repositorio {
   Future<Comercio> miComercio() async {
     final r = await api.get('/api/v1/catalogo/mi-comercio')
         as Map<String, dynamic>;
+    return Comercio.desdeJson(r);
+  }
+
+  /// La dirección y las coordenadas se pueden guardar por separado: es mejor
+  /// tener la dirección escrita que nada mientras se consiguen las coordenadas.
+  Future<Comercio> fijarUbicacion({
+    String? direccion,
+    Coordenada? punto,
+  }) async {
+    final r = await api.patch('/api/v1/catalogo/mi-comercio/ubicacion', cuerpo: {
+      if (direccion != null && direccion.trim().isNotEmpty)
+        'direccion': direccion.trim(),
+      if (punto != null) ...{
+        'latitud': punto.lat,
+        'longitud': punto.lng,
+      },
+    }) as Map<String, dynamic>;
     return Comercio.desdeJson(r);
   }
 
