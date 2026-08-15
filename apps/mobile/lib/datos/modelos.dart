@@ -8,6 +8,44 @@
 /// aquí haría que la pantalla contradijera lo que la base de datos guardó.
 const String monedaPorDefecto = 'USD';
 
+/// Qué clase de oferta es.
+///
+/// Cambia lo que quien compra puede esperar, así que se dice siempre: en una
+/// caja sorpresa el contenido es desconocido a propósito, y un lote se lleva
+/// entero.
+enum TipoOferta { unitario, cajaSorpresa, lote }
+
+TipoOferta _tipoDesde(String? v) => switch (v) {
+      'caja_sorpresa' => TipoOferta.cajaSorpresa,
+      'lote' => TipoOferta.lote,
+      // Incluye null: lo que no declara tipo es un artículo suelto, igual que
+      // decide el servidor.
+      _ => TipoOferta.unitario,
+    };
+
+String tipoOfertaApi(TipoOferta t) => switch (t) {
+      TipoOferta.unitario => 'unitario',
+      TipoOferta.cajaSorpresa => 'caja_sorpresa',
+      TipoOferta.lote => 'lote',
+    };
+
+extension TipoOfertaTexto on TipoOferta {
+  String get etiqueta => switch (this) {
+        TipoOferta.unitario => 'Unidad',
+        TipoOferta.cajaSorpresa => 'Caja sorpresa',
+        TipoOferta.lote => 'Lote',
+      };
+
+  /// Lo que hay que saber antes de comprar, no un eslogan.
+  String get explicacion => switch (this) {
+        TipoOferta.unitario => 'Se vende por unidad.',
+        TipoOferta.cajaSorpresa =>
+          'El contenido es sorpresa: lo elige el comercio con lo que le haya '
+              'quedado. Por eso está más barato.',
+        TipoOferta.lote => 'Se lleva completo, no por unidades sueltas.',
+      };
+}
+
 /// Estado de una publicación. Solo importa en el panel del comercio: la
 /// vitrina pública únicamente devuelve las publicadas.
 enum EstadoRescate {
@@ -34,6 +72,7 @@ class Rescate {
   Rescate({
     required this.id,
     required this.titulo,
+    required this.tipo,
     required this.descripcion,
     required this.categoria,
     required this.precioCentavos,
@@ -49,6 +88,7 @@ class Rescate {
 
   final String id;
   final String titulo;
+  final TipoOferta tipo;
   final String? descripcion;
   final String? categoria;
   final int precioCentavos;
@@ -79,6 +119,7 @@ class Rescate {
   factory Rescate.desdeJson(Map<String, dynamic> j) => Rescate(
         id: j['id'] as String,
         titulo: j['titulo'] as String,
+        tipo: _tipoDesde(j['tipo'] as String?),
         descripcion: j['descripcion'] as String?,
         categoria: j['categoria'] as String?,
         precioCentavos: j['precioCentavos'] as int,
@@ -159,6 +200,7 @@ class Orden {
     required this.moneda,
     required this.creadaEn,
     required this.expiraEn,
+    this.qrToken,
   });
 
   final String id;
@@ -175,6 +217,10 @@ class Orden {
   final String moneda;
   final DateTime creadaEn;
   final DateTime expiraEn;
+
+  /// Solo llega en la respuesta de creación y nunca más: el servidor guarda
+  /// únicamente su hash. Si se pierde, el retiro se hace por número de orden.
+  final String? qrToken;
 
   /// Lo pedido, en una línea legible: «2 × Pan artesanal».
   /// La v1 admite un solo rescate por orden, pero el modelo ya soporta varios.
@@ -200,6 +246,7 @@ class Orden {
         moneda: (j['moneda'] as String?) ?? monedaPorDefecto,
         creadaEn: DateTime.parse(j['createdAt'] as String).toLocal(),
         expiraEn: DateTime.parse(j['expiraAt'] as String).toLocal(),
+        qrToken: j['qrToken'] as String?,
       );
 }
 

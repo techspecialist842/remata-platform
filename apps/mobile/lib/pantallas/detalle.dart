@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../datos/api.dart';
 import '../datos/modelos.dart';
 import '../datos/repositorio.dart';
@@ -127,9 +128,25 @@ class _PantallaDetalleState extends State<PantallaDetalle> {
                           fondo: RTokens.successSoft,
                           color: RTokens.success,
                         ),
+                        Etiqueta(r.tipo.etiqueta,
+                            fondo: RTokens.primarySoft,
+                            color: RTokens.primary),
                         if (r.categoria != null) Etiqueta(r.categoria!),
                       ],
                     ),
+                    // Una caja sorpresa no se compra igual que una unidad: lo que
+                    // cambia se dice antes de reservar, no en la letra chica.
+                    if (r.tipo != TipoOferta.unitario) ...[
+                      const SizedBox(height: RTokens.s4),
+                      Container(
+                        padding: const EdgeInsets.all(RTokens.s3),
+                        decoration: BoxDecoration(
+                          color: RTokens.primarySoft,
+                          borderRadius: BorderRadius.circular(RTokens.radiusMd),
+                        ),
+                        child: Text(r.tipo.explicacion, style: RTokens.bodySm),
+                      ),
+                    ],
                     if (r.descripcion != null) ...[
                       const SizedBox(height: RTokens.s5),
                       const Text('Descripción', style: RTokens.titleM),
@@ -268,6 +285,51 @@ class _DialogoConfirmacion extends StatelessWidget {
               'Total: ${formatearPrecio(orden.totalCentavos, moneda: orden.moneda)}',
               style: RTokens.body,
             ),
+
+            // El código de retiro solo existe en esta respuesta: el servidor
+            // guarda su hash y no puede volver a dárnoslo. Por eso se muestra
+            // acá y se avisa de que el número de orden es el respaldo.
+            if (orden.qrToken != null) ...[
+              const SizedBox(height: RTokens.s4),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(RTokens.s3),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(RTokens.radiusMd),
+                    border: Border.all(color: RTokens.border),
+                  ),
+                  // SizedBox con medidas explícitas, no solo `size:`.
+                  // QrImageView usa un LayoutBuilder por dentro y AlertDialog
+                  // mide dimensiones intrínsecas de su contenido: sin
+                  // restricciones fijas, el diálogo revienta al renderizar y la
+                  // compra se cae en la última pantalla.
+                  child: SizedBox(
+                    width: 148,
+                    height: 148,
+                    child: QrImageView(
+                      // La clave lleva el token: si cambiara, Flutter redibuja
+                      // en vez de reutilizar el código anterior.
+                      key: ValueKey<String>(orden.qrToken!),
+                      data: orden.qrToken!,
+                      // Nivel de corrección alto: este código se escanea desde
+                      // la pantalla de un teléfono, a veces rayada o con
+                      // brillo, en un mostrador. Conviene que aguante
+                      // suciedad.
+                      errorCorrectionLevel: QrErrorCorrectLevel.H,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: RTokens.s2),
+              Text(
+                'Mostrá este código al retirar. Si no lo tenés a mano, alcanza '
+                'con el número de orden.',
+                style: RTokens.bodySm.copyWith(color: RTokens.textMuted),
+                textAlign: TextAlign.center,
+              ),
+            ],
+
             const SizedBox(height: RTokens.s3),
             Container(
               padding: const EdgeInsets.all(RTokens.s3),

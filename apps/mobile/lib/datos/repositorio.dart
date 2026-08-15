@@ -164,6 +164,7 @@ class Repositorio {
   /// nada salga a la vitrina por el mero hecho de haberlo escrito.
   Future<Rescate> crearRescate({
     required String titulo,
+    TipoOferta tipo = TipoOferta.unitario,
     String? descripcion,
     String? categoria,
     required int precioCentavos,
@@ -177,6 +178,7 @@ class Repositorio {
       idempotencyKey: _clave('resc'),
       cuerpo: {
         'titulo': titulo,
+        'tipo': tipoOfertaApi(tipo),
         if (descripcion != null && descripcion.isNotEmpty)
           'descripcion': descripcion,
         if (categoria != null && categoria.isNotEmpty) 'categoria': categoria,

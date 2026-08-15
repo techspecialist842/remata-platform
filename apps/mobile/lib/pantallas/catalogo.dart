@@ -294,6 +294,12 @@ class _TarjetaRescate extends StatelessWidget {
                         // Solo cuando se buscó por cercanía: en el resto de
                         // búsquedas el servidor no manda distancia, y
                         // inventarla sería mentir sobre dónde está el local.
+                        // El tipo va en la tarjeta: una caja sorpresa no se
+                        // compra con las mismas expectativas que una unidad.
+                        if (rescate.tipo != TipoOferta.unitario)
+                          Etiqueta(rescate.tipo.etiqueta,
+                              fondo: RTokens.primarySoft,
+                              color: RTokens.primary),
                         if (rescate.distanciaKm != null)
                           Etiqueta(
                             distanciaTexto(rescate.distanciaKm!),
