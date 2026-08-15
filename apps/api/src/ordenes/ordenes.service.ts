@@ -49,6 +49,14 @@ const TRANSICIONES: Record<OrdenStatus, OrdenStatus[]> = {
   [OrdenStatus.CANCELADA]: [],
 };
 
+/**
+ * Lo que devuelve crear(): la orden sin el hash del código, más el token en
+ * claro. El tipo lo dice explícitamente para que no se pueda devolver el hash
+ * por descuido — omitirlo es parte del contrato, no un detalle de la
+ * implementación.
+ */
+export type OrdenCreada = Omit<Orden, 'qrTokenHash'> & { qrToken: string };
+
 @Injectable()
 export class OrdenesService {
   constructor(
@@ -63,7 +71,7 @@ export class OrdenesService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  async crear(compradorId: string, dto: CrearOrdenDto): Promise<Orden> {
+  async crear(compradorId: string, dto: CrearOrdenDto): Promise<OrdenCreada> {
     return this.dataSource.transaction(async (manager) => {
       const rescate = await manager.findOne(Rescate, {
         where: { id: dto.rescateId },
