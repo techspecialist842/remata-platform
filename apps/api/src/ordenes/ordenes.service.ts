@@ -73,6 +73,20 @@ export class OrdenesService {
       }
 
       const ahora = new Date();
+
+      // Agotado es un conflicto de estado, no una petición mal formada, y sobre
+      // todo es exactamente lo mismo que le pasa a quien pierde la reserva
+      // atómica de abajo. Bajo concurrencia unos leen «agotado» y otros pierden
+      // la carrera; devolverles códigos distintos por una diferencia de
+      // microsegundos haría que el cliente mostrara dos mensajes para el mismo
+      // hecho: alguien se adelantó.
+      if (
+        rescate.status === RescateStatus.AGOTADO ||
+        rescate.cantidadDisponible < dto.cantidad
+      ) {
+        throw new ConflictException('No hay unidades suficientes disponibles');
+      }
+
       if (
         rescate.status !== RescateStatus.PUBLICADO ||
         rescate.validoDesde > ahora ||
@@ -165,21 +179,30 @@ export class OrdenesService {
         .andWhere('status = :publicado', { publicado: RescateStatus.PUBLICADO })
         .execute();
 
-      await this.audit.record({
-        actorUserId: compradorId,
-        action: 'ordenes.orden.creada',
-        targetType: 'orden',
-        targetId: orden.id,
-        metadata: { rescateId: rescate.id, totalCentavos: orden.totalCentavos },
-      });
+      await this.audit.record(
+        {
+          actorUserId: compradorId,
+          action: 'ordenes.orden.creada',
+          targetType: 'orden',
+          targetId: orden.id,
+          metadata: {
+            rescateId: rescate.id,
+            totalCentavos: orden.totalCentavos,
+          },
+        },
+        manager,
+      );
 
-      await this.notifications.enqueue({
-        userId: compradorId,
-        channel: NotificationChannelType.EMAIL,
-        templateKey: 'ordenes.creada',
-        priority: NotificationPriority.NORMAL,
-        payload: { numero: orden.numero, expiraAt: expiraAt.toISOString() },
-      });
+      await this.notifications.enqueue(
+        {
+          userId: compradorId,
+          channel: NotificationChannelType.EMAIL,
+          templateKey: 'ordenes.creada',
+          priority: NotificationPriority.NORMAL,
+          payload: { numero: orden.numero, expiraAt: expiraAt.toISOString() },
+        },
+        manager,
+      );
 
       // El token en claro viaja una sola vez, aquí. No se guarda ni se puede
       // volver a pedir: si se pierde, la orden se retira por su número con la
@@ -287,21 +310,27 @@ export class OrdenesService {
 
       await this.liberar(manager, orden, motivo, nota ?? null);
 
-      await this.audit.record({
-        actorUserId: userId,
-        action: 'ordenes.orden.cancelada',
-        targetType: 'orden',
-        targetId: orden.id,
-        metadata: { motivo },
-      });
+      await this.audit.record(
+        {
+          actorUserId: userId,
+          action: 'ordenes.orden.cancelada',
+          targetType: 'orden',
+          targetId: orden.id,
+          metadata: { motivo },
+        },
+        manager,
+      );
 
-      await this.notifications.enqueue({
-        userId: esComprador ? orden.merchantId : orden.compradorId,
-        channel: NotificationChannelType.EMAIL,
-        templateKey: 'ordenes.cancelada',
-        priority: NotificationPriority.HIGH,
-        payload: { numero: orden.numero, motivo },
-      });
+      await this.notifications.enqueue(
+        {
+          userId: esComprador ? orden.merchantId : orden.compradorId,
+          channel: NotificationChannelType.EMAIL,
+          templateKey: 'ordenes.cancelada',
+          priority: NotificationPriority.HIGH,
+          payload: { numero: orden.numero, motivo },
+        },
+        manager,
+      );
 
       return orden;
     });

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -9,6 +10,7 @@ import { Repository } from 'typeorm';
 import { Resena } from '../entities/resena.entity';
 import { Orden } from '../entities/orden.entity';
 import { OrdenItem } from '../entities/orden-item.entity';
+import { Merchant } from '../entities/merchant.entity';
 import { OrdenStatus } from '../common/enums/marketplace.enum';
 import { ReputacionService } from './reputacion.service';
 import { AuditLogService } from '../audit/audit-log.service';
@@ -19,6 +21,8 @@ export class ResenasService {
     @InjectRepository(Resena) private readonly resenas: Repository<Resena>,
     @InjectRepository(Orden) private readonly ordenes: Repository<Orden>,
     @InjectRepository(OrdenItem) private readonly items: Repository<OrdenItem>,
+    @InjectRepository(Merchant)
+    private readonly merchants: Repository<Merchant>,
     private readonly reputacion: ReputacionService,
     private readonly audit: AuditLogService,
   ) {}
@@ -71,6 +75,48 @@ export class ResenasService {
       targetType: 'resena',
       targetId: resena.id,
       metadata: { merchantId: orden.merchantId, calificacion },
+    });
+
+    return resena;
+  }
+
+  /**
+   * Réplica del comercio a una reseña suya.
+   *
+   * Una sola vez: la conversación pública no es un hilo, y permitir editar
+   * dejaría respuestas que ya nadie sabe a qué contestaban. No toca la nota —
+   * la calificación es de quien compró.
+   */
+  async responder(
+    userId: string,
+    resenaId: string,
+    texto: string,
+  ): Promise<Resena> {
+    const merchant = await this.merchants.findOne({ where: { userId } });
+    if (!merchant) {
+      throw new ForbiddenException('La cuenta no tiene un perfil de comercio');
+    }
+
+    const resena = await this.resenas.findOne({ where: { id: resenaId } });
+    // Un 404 y no un 403: decir «existe pero no es tuya» revelaría qué reseñas
+    // hay en la plataforma a quien vaya probando identificadores.
+    if (!resena || resena.merchantId !== merchant.id) {
+      throw new NotFoundException('Reseña no encontrada');
+    }
+    if (resena.respuesta !== null) {
+      throw new ConflictException('Esa reseña ya tiene respuesta');
+    }
+
+    resena.respuesta = texto;
+    resena.respondidaAt = new Date();
+    await this.resenas.save(resena);
+
+    await this.audit.record({
+      actorUserId: userId,
+      action: 'reputacion.resena.respondida',
+      targetType: 'resena',
+      targetId: resena.id,
+      metadata: { merchantId: merchant.id },
     });
 
     return resena;
