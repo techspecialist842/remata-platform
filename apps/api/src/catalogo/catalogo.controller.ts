@@ -24,6 +24,7 @@ import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { CatalogoService } from './catalogo.service';
 import { CrearRescateDto } from './dto/crear-rescate.dto';
 import { BuscarRescatesDto } from './dto/buscar-rescates.dto';
+import { UbicacionComercioDto } from './dto/ubicacion-comercio.dto';
 
 @ApiTags('catalogo')
 @Controller({ path: 'catalogo', version: '1' })
@@ -62,6 +63,23 @@ export class CatalogoController {
   @ApiErrorResponses(401, 403)
   miComercio(@CurrentUser() user: AuthenticatedUser) {
     return this.catalogo.miComercio(user.userId);
+  }
+
+  @Patch('mi-comercio/ubicacion')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.COMERCIO)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Fijar la dirección y el punto de retiro',
+    description:
+      'Sin coordenadas el comercio sigue vendiendo, pero no aparece en las búsquedas por cercanía.',
+  })
+  @ApiErrorResponses(400, 401, 403)
+  fijarUbicacion(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UbicacionComercioDto,
+  ) {
+    return this.catalogo.fijarUbicacion(user.userId, dto);
   }
 
   @Post('rescates')

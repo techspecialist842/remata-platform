@@ -28,8 +28,17 @@ import { CuponesService } from './cupones.service';
 import { ReputacionService } from './reputacion.service';
 import { CrearOrdenDto } from './dto/crear-orden.dto';
 
-/** Minutes a buyer has to be confirmed by the merchant before the order lapses. */
-const VENTANA_CONFIRMACION_MIN = 30;
+/**
+ * Minutos que el comercio tiene para confirmar antes de que la reserva caduque
+ * y las unidades vuelvan al catálogo.
+ *
+ * El plan fija la retención de inventario entre 5 y 15 minutos; se toma el
+ * extremo alto para no apretar de más a un comercio ocupado en mostrador. La
+ * cifra es deliberadamente corta: cada minuto que una unidad está retenida es
+ * un minuto que nadie más puede comprarla, y estas ofertas vencen el mismo día.
+ *
+ */
+const VENTANA_CONFIRMACION_MIN = 15;
 
 // Allowed transitions. Everything not listed here is rejected, so an invalid
 // move fails loudly instead of silently corrupting an order's history.
