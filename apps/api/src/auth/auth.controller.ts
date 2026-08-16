@@ -1,4 +1,5 @@
 import { Body, Controller, Post, Req } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { AuthService, RequestContext } from './auth.service';
@@ -10,6 +11,14 @@ import { Idempotent } from '../common/decorators/idempotent.decorator';
 import { ApiErrorResponses } from '../common/decorators/api-error-responses.decorator';
 
 @ApiTags('auth')
+// Las rutas de autenticación llevan un límite mucho más estricto que el
+// general: son las que se atacan por fuerza bruta, y un humano no inicia
+// sesión diez veces por minuto. El motor de fraude evalúa riesgo por cuenta;
+// esto frena volumen por origen, que es un problema distinto.
+@Throttle({
+  corta: { ttl: 60_000, limit: 10 },
+  larga: { ttl: 900_000, limit: 40 },
+})
 @Controller({ path: 'auth', version: '1' })
 export class AuthController {
   constructor(private readonly auth: AuthService) {}

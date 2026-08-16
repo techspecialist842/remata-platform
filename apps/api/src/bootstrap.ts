@@ -47,20 +47,14 @@ export function configureApp(app: INestApplication): void {
     });
   }
 
-  // No HTTPS listener exists until a domain is configured (see
-  // infra/terraform modules/alb), so two of Helmet's secure-by-default
-  // behaviors actively break the plain-HTTP site rather than harmlessly
-  // no-op:
-  //   - hsts: tells the browser to force every FUTURE request on this
-  //     origin to HTTPS.
-  //   - CSP's default `upgrade-insecure-requests` directive: tells the
-  //     browser to force every sub-resource request on the CURRENT page
-  //     to HTTPS, immediately, with no prior visit or cached state
-  //     needed.
-  // Both silently fail every sub-resource fetch with
-  // net::ERR_CONNECTION_REFUSED against :443 -- invisible to curl/HTTP
-  // status-code checks, only visible via actual browser network errors.
-  // Both are disabled here until HTTPS is actually activated.
+  // `upgrade-insecure-requests` sigue fuera del CSP a propósito: obliga al
+  // navegador a pedir por HTTPS cada sub-recurso de la página actual, de
+  // inmediato y sin visita previa. Cuando un entorno corre en HTTP plano —el
+  // desarrollo local, sin ir más lejos— eso falla cada petición contra un 443
+  // inexistente, y lo hace en silencio: curl y los códigos de estado no lo
+  // ven, solo los errores de red del navegador.
+  //
+  // HSTS sí se reactivó; ver más abajo.
   //
   // swagger-ui-bundle.js also uses `new Function(...)` internally, which
   // CSP treats like eval() -- strict default CSP silently breaks Swagger
@@ -69,12 +63,35 @@ export function configureApp(app: INestApplication): void {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- discarded on purpose
   const { 'upgrade-insecure-requests': _upgrade, ...baseCsp } =
     helmet.contentSecurityPolicy.getDefaultDirectives();
+
+  // HSTS (hallazgo 2 de la revisión de seguridad).
+  //
+  // Se deshabilitó en Fase 0, cuando los ambientes eran solo HTTP y HSTS
+  // rompía el sitio forzando al navegador contra un 443 inexistente. HTTPS
+  // está activo y verificado en los tres ambientes desde el 2026-08-04, así
+  // que esa razón caducó.
+  //
+  // Se reactiva ESCALONADO, no de golpe: la política queda cacheada en el
+  // navegador durante max-age, y si HTTPS llegara a fallar los usuarios se
+  // quedan sin acceso y no hay forma de avisarles. Se arranca en una hora —
+  // suficiente para proteger y corto para revertir— y se sube a un año cuando
+  // haya semanas de HTTPS estable. Se controla por entorno para poder subirlo
+  // sin desplegar código.
+  //
+  // Nada de includeSubDomains ni preload hasta llegar al año: preload es
+  // prácticamente irreversible.
+  const hstsSegundos = Number(process.env.HSTS_MAX_AGE ?? 3600);
+  const hsts =
+    hstsSegundos > 0
+      ? { maxAge: hstsSegundos, includeSubDomains: false, preload: false }
+      : false;
+
   const strictHelmet = helmet({
-    hsts: false,
+    hsts,
     contentSecurityPolicy: { useDefaults: false, directives: baseCsp },
   });
   const relaxedHelmet = helmet({
-    hsts: false,
+    hsts,
     contentSecurityPolicy: {
       useDefaults: false,
       directives: {

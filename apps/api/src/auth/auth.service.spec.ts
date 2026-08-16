@@ -32,7 +32,7 @@ describe('AuthService', () => {
     update: jest.Mock;
   };
   let fraud: { scoreEvent: jest.Mock };
-  let mfa: { verify: jest.Mock };
+  let mfa: { verify: jest.Mock; verificar: jest.Mock };
 
   const ctx = { ip: '127.0.0.1', userAgent: 'jest' };
 
@@ -60,7 +60,7 @@ describe('AuthService', () => {
         .fn()
         .mockResolvedValue({ score: 0, decision: 'allow', reasons: [] }),
     };
-    mfa = { verify: jest.fn() };
+    mfa = { verify: jest.fn(), verificar: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -169,7 +169,8 @@ describe('AuthService', () => {
 
     it('rejects a bad MFA code for an admin', async () => {
       usersRepo.findOne.mockResolvedValueOnce({ ...adminRow });
-      mfa.verify.mockReturnValueOnce(false);
+      // verificar() devuelve el paso consumido, o null si el código no vale.
+      mfa.verificar.mockReturnValueOnce(null);
 
       await expect(
         service.login(
@@ -181,7 +182,7 @@ describe('AuthService', () => {
 
     it('issues tokens for an admin with a valid MFA code', async () => {
       usersRepo.findOne.mockResolvedValueOnce({ ...adminRow });
-      mfa.verify.mockReturnValueOnce(true);
+      mfa.verificar.mockReturnValueOnce(59563932);
 
       const result = await service.login(
         { email: 'admin@b.com', password: PASSWORD, mfaToken: '123456' },

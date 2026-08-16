@@ -6,6 +6,7 @@ import { AppModule } from './../src/app.module';
 import { configureApp } from './../src/bootstrap';
 import { ReportesService } from './../src/catalogo/reportes.service';
 import { ModeracionService } from './../src/admin/moderacion.service';
+import { DataSource } from 'typeorm';
 
 // Moderación reactiva.
 //
@@ -34,6 +35,7 @@ describe('Moderación (e2e)', () => {
   let comercioToken: string;
   let compradorA: string;
   let compradorB: string;
+  let ds: DataSource;
   let reportes: ReportesService;
   let moderacion: ModeracionService;
 
@@ -80,6 +82,7 @@ describe('Moderación (e2e)', () => {
     configureApp(app);
     await app.init();
 
+    ds = app.get(DataSource);
     reportes = app.get(ReportesService);
     moderacion = app.get(ModeracionService);
 
@@ -89,6 +92,19 @@ describe('Moderación (e2e)', () => {
   });
 
   afterAll(async () => {
+    // La suite limpia lo suyo: sin esto la cola crece sin límite entre
+    // ejecuciones y acaba empujando fuera de las primeras páginas justo lo que
+    // la siguiente corrida quiere comprobar.
+    // SQL directo: el constructor de consultas espera nombres de propiedad de
+    // la entidad y aquí se razona en columnas, que es lo natural para una
+    // limpieza.
+    await ds.query(
+      `UPDATE reportes SET revisado_at = now()
+        WHERE revisado_at IS NULL
+          AND rescate_id IN (SELECT id FROM rescates WHERE titulo LIKE $1)`,
+      [`Moderar %${runId}`],
+    );
+
     await app.close();
   });
 
@@ -197,7 +213,18 @@ describe('Moderación (e2e)', () => {
           .expect(201);
       }
 
-      const cola = (await reportes.cola(1, 50)) as Cola;
+      // La cola es global y acumula lo de ejecuciones anteriores, así que no
+      // se puede dar por hecho que lo de esta corrida caiga en la primera
+      // página. Se recorren páginas conservando el orden que devuelve la API,
+      // que es justamente lo que se quiere comprobar.
+      const items: Cola['items'] = [];
+      for (let pagina = 1; pagina <= 20; pagina++) {
+        const p = (await reportes.cola(pagina, 50)) as Cola;
+        items.push(...p.items);
+        if (p.items.length < 50) break;
+      }
+
+      const cola = { items } as Cola;
       const conDos = cola.items.find((i) => i.rescate?.id === dosVeces);
       const conUna = cola.items.find((i) => i.rescate?.id === unaVez);
 

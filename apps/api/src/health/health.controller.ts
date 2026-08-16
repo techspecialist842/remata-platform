@@ -1,3 +1,4 @@
+import { SkipThrottle } from '@nestjs/throttler';
 import { Controller, Get, VERSION_NEUTRAL } from '@nestjs/common';
 import {
   HealthCheck,
@@ -14,6 +15,13 @@ export class HealthController {
     private readonly memory: MemoryHealthIndicator,
   ) {}
 
+  // Sin límite: lo consulta el balanceador cada pocos segundos y limitarlo
+  // haría que ECS diera por muerta una instancia sana justo cuando hay tráfico.
+  //
+  // Hay que nombrar los limitadores. `@SkipThrottle()` sin argumentos apunta al
+  // nombre «default», que aquí no existe porque los nuestros se llaman «corta»
+  // y «larga»: sin esto el decorador parece puesto y no exime de nada.
+  @SkipThrottle({ corta: true, larga: true })
   @Get()
   @HealthCheck()
   check() {
