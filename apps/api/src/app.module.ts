@@ -13,8 +13,14 @@ import { CatalogoModule } from './catalogo/catalogo.module';
 import { OrdenesModule } from './ordenes/ordenes.module';
 
 /** Lee un límite del entorno; si no está o no es un número, usa el de código. */
-function limite(variable: string, porDefecto: number): number {
-  const n = Number(process.env[variable]);
+function limite(
+  config: ConfigService,
+  variable: string,
+  porDefecto: number,
+): number {
+  // Vía ConfigService y no process.env directo: es el patrón del proyecto y
+  // permite sustituirlo en pruebas sin tocar variables del proceso.
+  const n = Number(config.get<string>(variable));
   return Number.isFinite(n) && n > 0 ? n : porDefecto;
 }
 
