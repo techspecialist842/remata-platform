@@ -3,7 +3,12 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import { DataSource } from 'typeorm';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { configureApp } from './../src/bootstrap';
+import { User } from './../src/entities/user.entity';
+import { Merchant } from './../src/entities/merchant.entity';
 
 /**
  * Criterio de aceptación de Fase 2: «las retenciones de inventario impiden la
@@ -18,10 +23,6 @@ import { configureApp } from './../src/bootstrap';
  * vendidas más las disponibles tienen que dar exactamente el total, siempre. Un
  * fallo aquí no es lentitud: es mercadería vendida dos veces.
  */
-
-interface TokensBody {
-  accessToken: string;
-}
 
 describe('Reservas bajo carga (e2e)', () => {
   let app: INestApplication<App>;
@@ -38,9 +39,25 @@ describe('Reservas bajo carga (e2e)', () => {
   const STOCK = 10;
 
   beforeAll(async () => {
+    // Límites muy altos SOLO en esta suite: simula treinta compradores
+    // distintos, que en producción vienen de treinta direcciones, mientras que
+    // aquí todos salen de 127.0.0.1 y el limitador los toma por uno abusando.
+    // Dejarlo activo mediría el limitador en vez de la concurrencia sobre el
+    // inventario. Que el limitador funciona lo verifica seguridad.e2e-spec.
+    process.env.THROTTLE_CORTA = '100000';
+    process.env.THROTTLE_LARGA = '100000';
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      // El límite de tasa se desactiva SOLO en esta suite.
+      //
+      // Simula treinta compradores distintos, que en producción vienen de
+      // treinta direcciones; aquí todos salen de 127.0.0.1 y el limitador los
+      // toma por uno solo abusando. Dejarlo activo mediría el limitador en vez
+      // de la concurrencia sobre el inventario, que es de lo que trata esta
+      // prueba. Que el limitador funciona lo verifica seguridad.e2e-spec.
+      .compile();
     app = moduleFixture.createNestApplication({ bodyParser: false });
     configureApp(app);
 
@@ -52,27 +69,58 @@ describe('Reservas bajo carga (e2e)', () => {
     // concurrencia sobre la base de datos, que es de lo que trata esta prueba.
     await app.listen(0);
 
-    const registrar = async (sufijo: string, role?: string) => {
-      const r = await http()
-        .post('/api/v1/auth/register')
-        .set('Idempotency-Key', key(sufijo))
-        .send({
+    const ds = app.get(DataSource);
+    const jwt = app.get(JwtService);
+    const config = app.get(ConfigService);
+    const usuarios = ds.getRepository(User);
+    const merchants = ds.getRepository(Merchant);
+
+    /**
+     * Crea la cuenta directamente y firma su token.
+     *
+     * No pasa por /auth/register a propósito. Esta suite necesita treinta y una
+     * cuentas y esa ruta lleva un límite de tasa estricto —correcto en
+     * producción, donde treinta compradores vienen de treinta direcciones, e
+     * inaplicable aquí, donde todo sale de 127.0.0.1—. Lo que se prueba es la
+     * concurrencia sobre el inventario, no el alta; montar los datos por la
+     * puerta de atrás mantiene la prueba centrada en su objeto, y de paso se
+     * ahorra treinta y un bcrypt de doce rondas.
+     */
+    const crearCuenta = async (sufijo: string, rol: 'usuario' | 'comercio') => {
+      const user = await usuarios.save(
+        usuarios.create({
           email: `carga-${sufijo}-${runId}@test.com`,
-          password: 'password123',
-          role,
-        })
-        .expect(201);
-      return (r.body as TokensBody).accessToken;
+          passwordHash: 'x'.repeat(60),
+          role: rol as never,
+          isActive: true,
+        }),
+      );
+      if (rol === 'comercio') {
+        await merchants.save(
+          merchants.create({
+            userId: user.id,
+            legalName: `Comercio ${sufijo}`,
+          }),
+        );
+      }
+      return jwt.signAsync(
+        { sub: user.id, email: user.email, role: rol },
+        {
+          secret: config.getOrThrow<string>('JWT_ACCESS_SECRET'),
+          expiresIn: '1h',
+        },
+      );
     };
 
-    comercioToken = await registrar('com', 'comercio');
-    // En serie: registrar en paralelo mide el registro, no las reservas.
+    comercioToken = await crearCuenta('com', 'comercio');
     for (let i = 0; i < COMPRADORES; i++) {
-      compradores.push(await registrar(`c${i}`));
+      compradores.push(await crearCuenta(`c${i}`, 'usuario'));
     }
   }, 120_000);
 
   afterAll(async () => {
+    delete process.env.THROTTLE_CORTA;
+    delete process.env.THROTTLE_LARGA;
     await app.close();
   });
 

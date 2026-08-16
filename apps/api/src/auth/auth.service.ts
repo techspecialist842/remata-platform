@@ -194,9 +194,11 @@ export class AuthService {
       if (!dto.mfaToken) {
         return { mfaRequired: true };
       }
-      if (!this.mfa.verify(dto.mfaToken, user.mfaSecret as string)) {
-        throw new UnauthorizedException('Invalid MFA code');
-      }
+      await this.consumirCodigoMfa(
+        user.id,
+        dto.mfaToken,
+        user.mfaSecret as string,
+      );
     }
 
     await this.users.update(user.id, { lastLoginAt: new Date() });
@@ -285,10 +287,55 @@ export class AuthService {
         'No pending MFA enrollment for this account',
       );
     }
-    if (!this.mfa.verify(token, user.mfaSecret)) {
+
+    // El token de alta es un JWT sin estado y vale una hora. Sin esto, uno
+    // filtrado seguiría siendo aceptado durante el resto de esa hora
+    // (hallazgo 7). Que el alta ya esté hecha es la marca de consumido: el
+    // token solo sirve mientras haya un alta pendiente, y un primer uso
+    // exitoso la cierra. Un intento fallido no lo gasta, que es lo correcto.
+    if (user.mfaEnabled) {
+      throw new BadRequestException(
+        'No pending MFA enrollment for this account',
+      );
+    }
+    await this.consumirCodigoMfa(userId, token, user.mfaSecret);
+    await this.users.update(userId, { mfaEnabled: true, isActive: true });
+  }
+
+  /**
+   * Valida un código TOTP y lo marca como gastado.
+   *
+   * El paso temporal se guarda y se rechaza cualquier código de un paso menor
+   * o igual, así que un código observado no sirve una segunda vez ni siquiera
+   * dentro de su ventana de validez (hallazgo 3 de la revisión).
+   *
+   * Se lee el último paso con una consulta aparte porque la columna es
+   * `select: false`: no debe viajar en las lecturas corrientes del usuario.
+   */
+  private async consumirCodigoMfa(
+    userId: string,
+    token: string,
+    secret: string,
+  ): Promise<void> {
+    const paso = this.mfa.verificar(token, secret);
+    if (paso === null) {
       throw new UnauthorizedException('Invalid MFA code');
     }
-    await this.users.update(userId, { mfaEnabled: true, isActive: true });
+
+    const fila = await this.users.findOne({
+      where: { id: userId },
+      select: { id: true, mfaLastStep: true },
+    });
+
+    if (fila?.mfaLastStep !== null && fila?.mfaLastStep !== undefined) {
+      if (paso <= fila.mfaLastStep) {
+        // Mismo mensaje que un código inválido: distinguir «ya usado» de
+        // «incorrecto» le diría a un atacante que acertó el código.
+        throw new UnauthorizedException('Invalid MFA code');
+      }
+    }
+
+    await this.users.update(userId, { mfaLastStep: paso });
   }
 
   private async issueTokens(
