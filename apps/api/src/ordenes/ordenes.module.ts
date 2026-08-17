@@ -7,6 +7,9 @@ import { Merchant } from '../entities/merchant.entity';
 import { Cupon } from '../entities/cupon.entity';
 import { Resena } from '../entities/resena.entity';
 import { Reputacion } from '../entities/reputacion.entity';
+import { AuditLog } from '../entities/audit-log.entity';
+import { User } from '../entities/user.entity';
+import { SenalesResenaService } from './senales-resena.service';
 import { OrdenesService } from './ordenes.service';
 import { CuponesService } from './cupones.service';
 import { ResenasService } from './resenas.service';
@@ -27,6 +30,8 @@ import { CatalogoModule } from '../catalogo/catalogo.module';
       Cupon,
       Resena,
       Reputacion,
+      AuditLog,
+      User,
     ]),
     AuditModule,
     NotificationsModule,
@@ -34,12 +39,13 @@ import { CatalogoModule } from '../catalogo/catalogo.module';
   ],
   controllers: [OrdenesController],
   providers: [
+    SenalesResenaService,
     OrdenesService,
     CuponesService,
     ResenasService,
     ReputacionService,
     OrdenesProcessor,
   ],
-  exports: [OrdenesService, CuponesService, ReputacionService],
+  exports: [OrdenesService, CuponesService, ReputacionService, ResenasService],
 })
 export class OrdenesModule {}
