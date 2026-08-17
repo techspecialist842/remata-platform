@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'datos/api.dart';
 import 'datos/repositorio.dart';
 import 'design/tema.dart';
@@ -34,6 +35,23 @@ class _AppRemataState extends State<AppRemata> {
       title: 'REMATA',
       debugShowCheckedModeBanner: false,
       theme: construirTema(),
+
+      // Español, y solo español.
+      //
+      // Sin esto los textos que pone Flutter por su cuenta salen en inglés en
+      // medio de una app en español: el botón de volver decía «Back» y el
+      // contador de un comentario, «1000 characters remaining».
+      //
+      // Se fija el idioma en vez de seguir al del teléfono a propósito: la app
+      // está escrita en español y no hay traducciones, así que un teléfono en
+      // inglés solo conseguiría mezclar los dos.
+      locale: const Locale('es'),
+      supportedLocales: const [Locale('es')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       home: !_autenticado
           ? PantallaAuth(
               repo: _repo,

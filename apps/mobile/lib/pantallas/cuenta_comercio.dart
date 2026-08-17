@@ -272,7 +272,7 @@ class _Ubicacion extends StatelessWidget {
                 const SizedBox(width: RTokens.s3),
                 Expanded(
                   child: Text(
-                    comercio.direccion ?? 'Todavía no cargaste tu dirección',
+                    comercio.direccion ?? 'Todavía no has puesto tu dirección',
                     style: comercio.direccion == null
                         ? RTokens.body.copyWith(color: RTokens.textMuted)
                         : RTokens.body,
@@ -289,8 +289,8 @@ class _Ubicacion extends StatelessWidget {
                   borderRadius: BorderRadius.circular(RTokens.radiusMd),
                 ),
                 child: Text(
-                  'Sin ubicación no aparecés cuando alguien busca ofertas cerca '
-                  'suyo. Tus publicaciones se siguen vendiendo igual.',
+                  'Sin ubicación no apareces cuando alguien busca ofertas cerca '
+                  'de él. Tus publicaciones se siguen vendiendo igual.',
                   style: RTokens.bodySm.copyWith(color: RTokens.warning),
                 ),
               ),

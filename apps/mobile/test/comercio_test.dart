@@ -182,7 +182,7 @@ void main() {
       await tester.pumpWidget(envolver(PantallaPublicaciones(repo: repo)));
       await tester.pumpAndSettle();
 
-      expect(find.text('Todavía no publicaste nada'), findsOneWidget);
+      expect(find.text('Todavía no has publicado nada'), findsOneWidget);
     });
   });
 

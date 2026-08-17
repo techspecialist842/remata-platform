@@ -124,7 +124,7 @@ class _PantallaPedidosState extends State<PantallaPedidos> {
             if (pagina.items.isEmpty) {
               return const EstadoVacio(
                 icono: Icons.receipt_long_outlined,
-                titulo: 'Todavía no tenés pedidos',
+                titulo: 'Todavía no tienes pedidos',
                 detalle: 'Cuando reserves una oferta, vas a verla acá.',
               );
             }
@@ -350,7 +350,7 @@ class _DialogoCalificarState extends State<_DialogoCalificar> {
             maxLines: 3,
             maxLength: 1000,
             decoration: const InputDecoration(
-              hintText: 'Contá cómo fue (opcional)',
+              hintText: 'Cuenta cómo fue (opcional)',
             ),
           ),
         ],

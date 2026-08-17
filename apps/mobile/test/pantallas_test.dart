@@ -311,7 +311,7 @@ void main() {
       await tester.pumpWidget(envolver(PantallaPedidos(repo: repo)));
       await tester.pumpAndSettle();
 
-      expect(find.text('Todavía no tenés pedidos'), findsOneWidget);
+      expect(find.text('Todavía no tienes pedidos'), findsOneWidget);
     });
   });
 }

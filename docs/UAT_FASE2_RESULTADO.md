@@ -64,9 +64,9 @@ ningún Sev-1.
 
 | # | Caso | Severidad | Qué pasó | Qué se esperaba |
 |---|---|---|---|---|
-| 1 | Toda la app | **Sev-3** | La app está escrita en **voseo rioplatense**: «Ingresá», «¿No tenés cuenta?», «Creá una», «Empezá a ahorrar», «Usá al menos 10 caracteres», «Vendé lo que te sobra», «no aparecés», «Probá quitando el filtro». Son 13 apariciones en 6 archivos | Panamá usa «tú». Debería decir «Ingresa», «¿No tienes cuenta?», «Crea una» |
-| 2 | 1.3 | **Sev-3** | Al registrarse con un correo ya usado, el aviso sale **en inglés**: «Email already registered» | Un mensaje en español |
-| 3 | 6.1 | **Sev-3** | El contador del comentario de la reseña sale **en inglés**: «1000 characters remaining» | En español, o quitarlo |
+| 1 | Toda la app | **Sev-3 — CORREGIDO** | La app estaba escrita en **voseo rioplatense**: «Ingresá», «¿No tenés cuenta?», «Creá una», «Empezá a ahorrar», «Usá al menos 10 caracteres», «Vendé lo que te sobra», «no aparecés», «Probá quitando el filtro» | Panamá usa «tú»: «Entra», «¿No tienes cuenta?», «Crea una» |
+| 2 | 1.3 | **Sev-3 — CORREGIDO** | Al registrarse con un correo ya usado, el aviso salía **en inglés**: «Email already registered». Y no era el único: el servidor contestaba en inglés en trece sitios | Un mensaje en español |
+| 3 | 6.1 | **Sev-3 — CORREGIDO** | El contador del comentario salía **en inglés**: «1000 characters remaining», y el botón de volver decía «Back» | En español |
 | 4 | 7.1–7.3 | **Sev-2** | **No hay forma de reportar una publicación desde la app.** La función existe en el servidor y está probada, pero no hay pantalla | Poder reportar desde la ficha de la oferta |
 | 5 | 6.6–6.7 | **Sev-2** | **El comercio no puede responder a una reseña desde la app.** Igual que el anterior: hecho en el servidor, sin pantalla | Poder responder desde «Mi comercio» |
 | 6 | 3.2 | **Sev-3** | Con la ubicación ya guardada, la ficha del comercio **sigue diciendo «Todavía no cargaste tu dirección»** mientras el botón de al lado dice «Cambiar ubicación». Se contradicen. El aviso de «no aparecés en búsquedas cercanas» sí desaparece, que es lo importante | Que la ficha refleje que el punto de retiro está puesto |
@@ -106,6 +106,30 @@ renovación es invisible. Cubierto por cinco pruebas nuevas en
 [`sesion_test.dart`](../apps/mobile/test/sesion_test.dart), que se comprobaron
 contra el código anterior antes de darlas por buenas —fallaban, que es lo que
 las hace valer algo—.
+
+### Sobre los defectos 1, 2 y 3, ya corregidos
+
+**El voseo** estaba en trece frases de seis archivos. Todas convertidas a
+tuteo, que es lo de Panamá. Las pruebas que afirmaban los textos viejos se
+actualizaron con ellos.
+
+**El inglés venía de dos sitios distintos**, y solo uno se veía a simple vista:
+
+- **El servidor** contestaba en inglés en trece sitios —«Email already
+  registered», «Invalid credentials», «Unauthorized»…—. Traducidos todos. Los
+  dos mensajes que son vagos a propósito —los del motor de fraude— siguen
+  siéndolo: decir por qué se bloqueó a alguien le enseña qué cambiar para
+  pasar.
+- **El propio Flutter**, que pone por su cuenta el botón de volver, el contador
+  de caracteres y los textos de un calendario. Salían en inglés porque la app
+  **no tenía configurado ningún idioma**. Ahora declara español, y con eso caen
+  todos a la vez, no solo los dos que encontró el UAT.
+
+Lo segundo no se puede comprobar buscando literales en el código, porque no hay
+ninguno: los pone el framework. Se comprobó en la app real —el botón dice
+«Atrás»— y quedó una prueba que lo fija, más otra que verifica que `main.dart`
+sigue declarando el idioma, para que quitarlo no deje las pruebas en verde con
+la app en inglés.
 
 ### Sobre el defecto 6, que tiene arreglo pequeño
 

@@ -47,7 +47,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
     const rawKey = Array.isArray(headerValue) ? headerValue[0] : headerValue;
     if (!rawKey) {
       throw new BadRequestException(
-        `${HEADER} header is required for this operation`,
+        `Falta la cabecera ${HEADER}, obligatoria en esta operación`,
       );
     }
 
@@ -64,7 +64,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
     if (existing) {
       if (existing.requestHash !== requestHash) {
         throw new ConflictException(
-          'Idempotency-Key was already used with a different request payload',
+          'Esa Idempotency-Key ya se usó con un contenido distinto',
         );
       }
       // Replay the original status too, not just the body: without this the

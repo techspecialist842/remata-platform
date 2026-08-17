@@ -77,7 +77,7 @@ class _PantallaAuthState extends State<PantallaAuth> {
       });
     } catch (_) {
       setState(() {
-        _error = 'No se pudo conectar. Revisá tu conexión e intentá de nuevo.';
+        _error = 'No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.';
         _cargando = false;
       });
     }
@@ -100,7 +100,7 @@ class _PantallaAuthState extends State<PantallaAuth> {
                     const _Marca(),
                     const SizedBox(height: RTokens.s8),
                     Text(
-                      _registrando ? 'Creá tu cuenta' : 'Bienvenido de vuelta',
+                      _registrando ? 'Crea tu cuenta' : 'Bienvenido de vuelta',
                       style: RTokens.displayL,
                       textAlign: TextAlign.center,
                     ),
@@ -108,9 +108,9 @@ class _PantallaAuthState extends State<PantallaAuth> {
                     Text(
                       _registrando
                           ? (_comercio
-                              ? 'Vendé lo que te sobra antes de que se pierda.'
-                              : 'Empezá a ahorrar y a evitar desperdicio.')
-                          : 'Ingresá para ver las ofertas cerca tuyo.',
+                              ? 'Vende lo que te sobra antes de que se pierda.'
+                              : 'Empieza a ahorrar y a evitar desperdicio.')
+                          : 'Entra para ver las ofertas cerca de ti.',
                       style: RTokens.body,
                       textAlign: TextAlign.center,
                     ),
@@ -152,7 +152,7 @@ class _PantallaAuthState extends State<PantallaAuth> {
                           // Para un comercio el nombre no es decorativo: pasa a
                           // ser su razón social en el alta.
                           if (_comercio && (v?.trim().isEmpty ?? true)) {
-                            return 'Poné el nombre de tu comercio';
+                            return 'Escribe el nombre de tu comercio';
                           }
                           return null;
                         },
@@ -171,7 +171,7 @@ class _PantallaAuthState extends State<PantallaAuth> {
                       ),
                       validator: (v) {
                         final t = v?.trim() ?? '';
-                        if (t.isEmpty) return 'Ingresá tu correo';
+                        if (t.isEmpty) return 'Escribe tu correo';
                         if (!t.contains('@') || !t.contains('.')) {
                           return 'Ese correo no parece válido';
                         }
@@ -190,11 +190,11 @@ class _PantallaAuthState extends State<PantallaAuth> {
                         prefixIcon: Icon(Icons.lock_outline),
                       ),
                       validator: (v) {
-                        if ((v ?? '').isEmpty) return 'Ingresá tu contraseña';
+                        if ((v ?? '').isEmpty) return 'Escribe tu contraseña';
                         // El backend exige 10 caracteres; avisarlo acá evita un
                         // viaje de ida y vuelta para descubrirlo.
                         if (_registrando && v!.length < 10) {
-                          return 'Usá al menos 10 caracteres';
+                          return 'Usa al menos 10 caracteres';
                         }
                         return null;
                       },
@@ -250,8 +250,8 @@ class _PantallaAuthState extends State<PantallaAuth> {
                               }),
                       child: Text(
                         _registrando
-                            ? '¿Ya tenés cuenta? Iniciá sesión'
-                            : '¿No tenés cuenta? Creá una',
+                            ? '¿Ya tienes cuenta? Inicia sesión'
+                            : '¿No tienes cuenta? Crea una',
                         style: const TextStyle(
                           color: RTokens.primary,
                           fontWeight: FontWeight.w600,
