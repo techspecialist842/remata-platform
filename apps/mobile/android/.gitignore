@@ -12,3 +12,7 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Artefactos de compilación de Gradle. La regla /build/ del nivel superior
+# no los cubre: solo alcanza a apps/mobile/build.
+/build/
