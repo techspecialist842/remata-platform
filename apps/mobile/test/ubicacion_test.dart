@@ -288,7 +288,7 @@ void main() {
       expect(find.text('Cambiar ubicación'), findsOneWidget);
     });
 
-    testWidgets('sin dirección lo dice en vez de dejarlo en blanco',
+    testWidgets('sin dirección ni coordenadas lo dice en vez de dejarlo en blanco',
         (tester) async {
       await tester.pumpWidget(pantalla(
         clienteComercio(),
@@ -297,6 +297,24 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Todavía no has puesto tu dirección'), findsOneWidget);
+    });
+
+    // «Usar mi ubicación actual» guarda coordenadas y deja vacía la dirección
+    // escrita. La ficha decía entonces «Todavía no has puesto tu dirección»
+    // junto a un botón que decía «Cambiar ubicación»: el comercio se quedaba
+    // sin saber si su punto de retiro había quedado guardado.
+    testWidgets('con coordenadas y sin dirección no dice que falta la dirección',
+        (tester) async {
+      await tester.pumpWidget(pantalla(
+        clienteComercio(lat: 8.98, lng: -79.52),
+        UbicacionFalsa.en(const Coordenada(8.98, -79.52)),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Todavía no has puesto tu dirección'), findsNothing);
+      expect(find.text('Punto de retiro fijado en el mapa'), findsOneWidget);
+      // Y el botón sigue diciendo «Cambiar», que es lo coherente.
+      expect(find.text('Cambiar ubicación'), findsOneWidget);
     });
 
     testWidgets('guarda la dirección junto con las coordenadas tomadas',

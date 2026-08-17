@@ -270,10 +270,21 @@ class _Ubicacion extends StatelessWidget {
                   color: ubicado ? RTokens.primary : RTokens.textMuted,
                 ),
                 const SizedBox(width: RTokens.s3),
+                // Tres estados, no dos.
+                //
+                // «Usar mi ubicación actual» guarda coordenadas y deja la
+                // dirección escrita vacía, que es un caso corriente. Mirando
+                // solo la dirección, la ficha decía «Todavía no has puesto tu
+                // dirección» junto a un botón que decía «Cambiar ubicación»:
+                // dos frases que se contradicen, y el comercio sin saber si su
+                // punto de retiro quedó guardado.
                 Expanded(
                   child: Text(
-                    comercio.direccion ?? 'Todavía no has puesto tu dirección',
-                    style: comercio.direccion == null
+                    comercio.direccion ??
+                        (ubicado
+                            ? 'Punto de retiro fijado en el mapa'
+                            : 'Todavía no has puesto tu dirección'),
+                    style: comercio.direccion == null && !ubicado
                         ? RTokens.body.copyWith(color: RTokens.textMuted)
                         : RTokens.body,
                   ),
