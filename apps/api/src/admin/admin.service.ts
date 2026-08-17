@@ -41,7 +41,7 @@ export class AdminService {
   ): Promise<{ userId: string; otpauthUrl: string; enrollmentToken: string }> {
     const existing = await this.users.findOne({ where: { email: dto.email } });
     if (existing) {
-      throw new ConflictException('Email already registered');
+      throw new ConflictException('Ese correo ya tiene una cuenta');
     }
 
     const mfaSecret = this.mfa.generateSecret();

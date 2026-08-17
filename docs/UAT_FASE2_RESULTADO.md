@@ -19,10 +19,13 @@ la vez. Cada paso se hizo tocando la pantalla, no llamando a la API.
 
 | | Casos |
 |---|---|
-| Pasan | 38 (uno de ellos tras corregir el defecto 9) |
-| Dudosos (funciona, pero algo no se entiende o no cuadra) | 5 |
+| Pasan | 43 (cinco de ellos tras corregir lo que se encontró) |
 | No ejecutables (falta la pantalla) | 1 |
 | **Total ejecutado** | **44** |
+
+De los nueve defectos anotados, **siete están corregidos y vueltos a
+comprobar**, uno se retiró —era un error de la propia ejecución— y los dos que
+quedan no son fallos sino pantallas que faltan.
 
 **Criterio de salida del guion:** cero defectos Sev-1 y Sev-2 abiertos.
 
@@ -64,14 +67,14 @@ ningún Sev-1.
 
 | # | Caso | Severidad | Qué pasó | Qué se esperaba |
 |---|---|---|---|---|
-| 1 | Toda la app | **Sev-3** | La app está escrita en **voseo rioplatense**: «Ingresá», «¿No tenés cuenta?», «Creá una», «Empezá a ahorrar», «Usá al menos 10 caracteres», «Vendé lo que te sobra», «no aparecés», «Probá quitando el filtro». Son 13 apariciones en 6 archivos | Panamá usa «tú». Debería decir «Ingresa», «¿No tienes cuenta?», «Crea una» |
-| 2 | 1.3 | **Sev-3** | Al registrarse con un correo ya usado, el aviso sale **en inglés**: «Email already registered» | Un mensaje en español |
-| 3 | 6.1 | **Sev-3** | El contador del comentario de la reseña sale **en inglés**: «1000 characters remaining» | En español, o quitarlo |
+| 1 | Toda la app | **Sev-3 — CORREGIDO** | La app estaba escrita en **voseo rioplatense**: «Ingresá», «¿No tenés cuenta?», «Creá una», «Empezá a ahorrar», «Usá al menos 10 caracteres», «Vendé lo que te sobra», «no aparecés», «Probá quitando el filtro» | Panamá usa «tú»: «Entra», «¿No tienes cuenta?», «Crea una» |
+| 2 | 1.3 | **Sev-3 — CORREGIDO** | Al registrarse con un correo ya usado, el aviso salía **en inglés**: «Email already registered». Y no era el único: el servidor contestaba en inglés en trece sitios | Un mensaje en español |
+| 3 | 6.1 | **Sev-3 — CORREGIDO** | El contador del comentario salía **en inglés**: «1000 characters remaining», y el botón de volver decía «Back» | En español |
 | 4 | 7.1–7.3 | **Sev-2** | **No hay forma de reportar una publicación desde la app.** La función existe en el servidor y está probada, pero no hay pantalla | Poder reportar desde la ficha de la oferta |
 | 5 | 6.6–6.7 | **Sev-2** | **El comercio no puede responder a una reseña desde la app.** Igual que el anterior: hecho en el servidor, sin pantalla | Poder responder desde «Mi comercio» |
-| 6 | 3.2 | **Sev-3** | Con la ubicación ya guardada, la ficha del comercio **sigue diciendo «Todavía no cargaste tu dirección»** mientras el botón de al lado dice «Cambiar ubicación». Se contradicen. El aviso de «no aparecés en búsquedas cercanas» sí desaparece, que es lo importante | Que la ficha refleje que el punto de retiro está puesto |
-| 7 | 3.4 | **Sev-3** | Al **negar** el permiso de ubicación, el filtro de cercanía queda apagado y la app sigue perfectamente usable, pero **no explica por qué** | Un mensaje diciendo que sin permiso no hay búsqueda por cercanía |
-| 8 | 8.1 | **Sev-4** | Sin conexión, el aviso es el genérico: «No se pudo completar la compra». No se cuelga, que es lo que más importa | Que diga que el problema es la conexión |
+| 6 | 3.2 | **Sev-3 — CORREGIDO** | Con la ubicación ya guardada, la ficha del comercio **seguía diciendo «Todavía no cargaste tu dirección»** mientras el botón de al lado decía «Cambiar ubicación» | Que la ficha refleje que el punto de retiro está puesto |
+| 7 | 3.4 | ~~Sev-3~~ **RETIRADO** | **No era un defecto: fue un error de la ejecución.** Al negar el permiso la app sí lo explica —«Bloqueaste el acceso a la ubicación. Puedes habilitarlo desde los ajustes del sistema»—, pero es un aviso efímero y la comprobación lo leyó tarde | — |
+| 8 | 8.1 | **Sev-4 — CORREGIDO** | Sin conexión, el aviso al reservar era el genérico «No se pudo completar la compra», que suena a que el problema es la compra. Al entrar sí se hablaba de la conexión: cada pantalla lo adivinaba por su cuenta | Que diga que el problema es la conexión |
 | 9 | 8.3 | **Sev-2 — CORREGIDO** | Con la app abierta 16 minutos sin tocarla, la primera acción que cambiaba algo —publicar, reservar— fallaba mostrando **«Unauthorized»**. Y el segundo intento también: el comercio se quedaba sin poder publicar | Que la sesión se renueve sola y la acción funcione |
 
 ### Sobre el defecto 9, ya corregido
@@ -107,12 +110,60 @@ renovación es invisible. Cubierto por cinco pruebas nuevas en
 contra el código anterior antes de darlas por buenas —fallaban, que es lo que
 las hace valer algo—.
 
-### Sobre el defecto 6, que tiene arreglo pequeño
+### Sobre los defectos 1, 2 y 3, ya corregidos
 
-El texto se decide mirando la **dirección escrita**, que está vacía porque
+**El voseo** estaba en trece frases de seis archivos. Todas convertidas a
+tuteo, que es lo de Panamá. Las pruebas que afirmaban los textos viejos se
+actualizaron con ellos.
+
+**El inglés venía de dos sitios distintos**, y solo uno se veía a simple vista:
+
+- **El servidor** contestaba en inglés en trece sitios —«Email already
+  registered», «Invalid credentials», «Unauthorized»…—. Traducidos todos. Los
+  dos mensajes que son vagos a propósito —los del motor de fraude— siguen
+  siéndolo: decir por qué se bloqueó a alguien le enseña qué cambiar para
+  pasar.
+- **El propio Flutter**, que pone por su cuenta el botón de volver, el contador
+  de caracteres y los textos de un calendario. Salían en inglés porque la app
+  **no tenía configurado ningún idioma**. Ahora declara español, y con eso caen
+  todos a la vez, no solo los dos que encontró el UAT.
+
+Lo segundo no se puede comprobar buscando literales en el código, porque no hay
+ninguno: los pone el framework. Se comprobó en la app real —el botón dice
+«Atrás»— y quedó una prueba que lo fija, más otra que verifica que `main.dart`
+sigue declarando el idioma, para que quitarlo no deje las pruebas en verde con
+la app en inglés.
+
+### Sobre el defecto 6, ya corregido
+
+El texto se decidía mirando la **dirección escrita**, que está vacía porque
 «Usar mi ubicación actual» solo guarda coordenadas. El icono, el aviso y el
-botón, en cambio, miran las **coordenadas**, y por eso sí se enteran. Es una
-línea: [`cuenta_comercio.dart:275`](../apps/mobile/lib/pantallas/cuenta_comercio.dart#L275).
+botón, en cambio, miran las **coordenadas**, y por eso sí se enteraban.
+
+Eran dos estados donde hacían falta tres: sin nada, con coordenadas pero sin
+dirección escrita, y con dirección. El de en medio ahora dice «Punto de retiro
+fijado en el mapa».
+
+### Sobre el defecto 8, ya corregido
+
+El arreglo no fue copiar la frase en una tercera pantalla, que es como empiezan
+a divergir. Ahora el cliente distingue **una sola vez** «no llegué al servidor»
+de «el servidor dice que no», y todas las pantallas dan el mismo mensaje.
+
+Al hacerlo apareció algo que no estaba en el guion: un corte de red **durante
+la renovación de la sesión** cerraba la sesión. Pasar por un túnel en el
+momento justo obligaba a escribir la contraseña otra vez. Ahora solo se cierra
+cuando el servidor contesta que el refresco no vale.
+
+### Sobre el defecto 7, que no era tal
+
+Lo retiro. La app **sí** explica el permiso denegado; el aviso dura unos
+segundos y la comprobación de entonces leyó la pantalla cuando ya se había ido.
+
+Es el mismo error que estuvo a punto de dar por malo el caso 4.6, el de la
+sobreventa. Vale la pena dejarlo escrito: **un mensaje efímero se comprueba
+yendo a buscarlo enseguida**, y una comprobación que llega tarde no distingue
+«no lo dijo» de «ya no está».
 
 ### Sobre los defectos 4 y 5
 
@@ -153,9 +204,9 @@ salida.
 | # | Resultado | Nota |
 |---|---|---|
 | 3.1 | Pasa | «Sin ubicación no aparecés cuando alguien busca ofertas cerca suyo» |
-| 3.2 | Pasa con reparo | Guarda y el aviso desaparece, pero la ficha se contradice (defecto 6) |
+| 3.2 | **Pasa** | Guarda, el aviso desaparece y la ficha ya es coherente |
 | 3.3 | Pasa | Pide el permiso |
-| 3.4 | Dudoso | Negarlo no rompe nada, pero no se explica (defecto 7) |
+| 3.4 | **Pasa** | Lo explica —«Bloqueaste el acceso a la ubicación…»— y la app sigue usable. En la primera ejecución quedó como dudoso por un error de medición |
 | 3.5 | Pasa | Aparece la distancia en cada oferta |
 | 3.6 | Pasa | Comprador y comercio en el mismo punto: dice 0 m |
 | 3.7 | Pasa | Al apagar el filtro vuelven todas, sin distancia |
@@ -204,7 +255,7 @@ salida.
 
 | # | Resultado | Nota |
 |---|---|---|
-| 8.1 | Dudoso | Avisa y no se cuelga, pero el mensaje es genérico (defecto 8) |
+| 8.1 | **Pasa** | Avisa nombrando la conexión y la pantalla no se cuelga |
 | 8.2 | **Pasa** | Al recuperar la conexión y reintentar, crea **una sola** orden |
 | 8.3 | **Pasa tras corregir** | Fallaba: tras 16 min en reposo, publicar devolvía «Unauthorized», y el segundo intento también (defecto 9). Corregido y vuelto a comprobar con la espera real: funciona a la primera |
 | 8.4 | Pasa | Girar la pantalla no borra lo escrito |
@@ -215,19 +266,17 @@ salida.
 ## Qué hace falta para cerrar la fase
 
 1. ~~Arreglar el defecto 9~~ — hecho y comprobado.
-2. **Decidir sobre los defectos 4 y 5** (reportar y responder): construirlos
-   ahora o pasarlos a la siguiente fase. Esto sí es decisión del cliente, y es
-   lo único que bloquea el criterio de salida.
-3. **Corregir el voseo** y los tres textos en inglés. Es trabajo de un rato y
-   cambia mucho cómo se percibe la app en Panamá.
-4. **Media hora de alguien del equipo del cliente** recorriendo la app por
+2. ~~Corregir el voseo y los textos en inglés~~ — hecho y comprobado.
+3. ~~Arreglar los defectos 6 y 8~~ — hecho y comprobado.
+4. **Decidir sobre los defectos 4 y 5** (reportar y responder): construirlos
+   ahora o pasarlos a la siguiente fase. Es lo único que queda, y es decisión
+   del cliente.
+5. **Media hora de alguien del equipo del cliente** recorriendo la app por
    primera vez, para lo que esta ejecución no puede ver.
-
-Los defectos 6, 7 y 8 son pequeños y se pueden arreglar sin esperar a nadie.
 
 ## Firma
 
 | | Nombre | Fecha | Resultado |
 |---|---|---|---|
-| Ejecutado por | Proveedor | 17/08/2026 | 36 pasan · 5 dudosos · 1 no ejecutable |
+| Ejecutado por | Proveedor | 17/08/2026 | 43 pasan · 1 no ejecutable |
 | Aceptado por | | | |

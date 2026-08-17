@@ -119,7 +119,7 @@ class _PantallaNuevaPublicacionState extends State<PantallaNuevaPublicacion> {
       });
     } catch (_) {
       setState(() {
-        _error = 'No se pudo conectar. Revisá tu conexión e intentá de nuevo.';
+        _error = 'No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.';
         _guardando = false;
       });
     }
@@ -151,7 +151,7 @@ class _PantallaNuevaPublicacionState extends State<PantallaNuevaPublicacion> {
               ),
               validator: (v) {
                 final t = v?.trim() ?? '';
-                if (t.length < 3) return 'Escribí al menos 3 caracteres';
+                if (t.length < 3) return 'Escribe al menos 3 caracteres';
                 if (t.length > 160) return 'Máximo 160 caracteres';
                 return null;
               },
@@ -208,7 +208,7 @@ class _PantallaNuevaPublicacionState extends State<PantallaNuevaPublicacion> {
               ),
               validator: (v) {
                 final c = aCentavos(v ?? '');
-                if (c == null) return 'Escribí un importe, por ejemplo 4.50';
+                if (c == null) return 'Escribe un importe, por ejemplo 4.50';
                 if (c < 1) return 'Tiene que ser mayor que cero';
                 return null;
               },
@@ -227,7 +227,7 @@ class _PantallaNuevaPublicacionState extends State<PantallaNuevaPublicacion> {
                 final t = v?.trim() ?? '';
                 if (t.isEmpty) return null;
                 final original = aCentavos(t);
-                if (original == null) return 'Escribí un importe válido';
+                if (original == null) return 'Escribe un importe válido';
                 final venta = aCentavos(_precio.text);
                 if (venta != null && original <= venta) {
                   return 'Tiene que ser mayor que el precio de venta';
@@ -303,7 +303,7 @@ class _PantallaNuevaPublicacionState extends State<PantallaNuevaPublicacion> {
             ),
             const SizedBox(height: RTokens.s2),
             Text(
-              'Queda guardado sin salir al catálogo. Lo publicás cuando quieras '
+              'Queda guardado sin salir al catálogo. Lo publicas cuando quieras '
               'desde «Mis publicaciones».',
               style: RTokens.bodySm.copyWith(color: RTokens.textMuted),
               textAlign: TextAlign.center,

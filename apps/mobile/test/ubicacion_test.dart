@@ -126,7 +126,7 @@ void main() {
           envolver(PantallaCatalogo(repo: repo, ubicacion: ubi)));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Cerca tuyo'));
+      await tester.tap(find.text('Cerca de ti'));
       await tester.pumpAndSettle();
 
       expect(ubi.llamadas, 1);
@@ -153,13 +153,13 @@ void main() {
       await tester.pumpAndSettle();
       final antes = consultas;
 
-      await tester.tap(find.text('Cerca tuyo'));
+      await tester.tap(find.text('Cerca de ti'));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Necesitamos tu ubicación'), findsOneWidget);
       expect(consultas, antes, reason: 'no debe rebuscar sin ubicación');
       // El chip vuelve a su estado apagado, no se queda a medias.
-      expect(find.text('Cerca tuyo'), findsOneWidget);
+      expect(find.text('Cerca de ti'), findsOneWidget);
     });
 
     testWidgets('el GPS apagado se distingue del permiso negado',
@@ -171,7 +171,7 @@ void main() {
       await tester.pumpWidget(
           envolver(PantallaCatalogo(repo: repo, ubicacion: ubi)));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Cerca tuyo'));
+      await tester.tap(find.text('Cerca de ti'));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('está apagada'), findsOneWidget);
@@ -187,13 +187,13 @@ void main() {
           envolver(PantallaCatalogo(repo: repo, ubicacion: ubi)));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Cerca tuyo'));
+      await tester.tap(find.text('Cerca de ti'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Cerca tuyo (5 km)'));
+      await tester.tap(find.text('Cerca de ti (5 km)'));
       await tester.pumpAndSettle();
 
       expect(ubi.llamadas, 1);
-      expect(find.text('Cerca tuyo'), findsOneWidget);
+      expect(find.text('Cerca de ti'), findsOneWidget);
     });
 
     // Vacío por cercanía y vacío a secas piden salidas distintas.
@@ -207,10 +207,10 @@ void main() {
       await tester.pumpWidget(
           envolver(PantallaCatalogo(repo: repo, ubicacion: ubi)));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Cerca tuyo'));
+      await tester.tap(find.text('Cerca de ti'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Nada cerca tuyo ahora'), findsOneWidget);
+      expect(find.text('Nada cerca de ti ahora'), findsOneWidget);
       expect(find.text('Buscar en toda la ciudad'), findsOneWidget);
       expect(find.text('Sin ofertas por ahora'), findsNothing);
     });
@@ -271,7 +271,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Av. Balboa 100'), findsOneWidget);
-      expect(find.textContaining('no aparecés cuando alguien busca'),
+      expect(find.textContaining('no apareces cuando alguien busca'),
           findsOneWidget);
       expect(find.text('Fijar ubicación'), findsOneWidget);
     });
@@ -283,12 +283,12 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('no aparecés cuando alguien busca'),
+      expect(find.textContaining('no apareces cuando alguien busca'),
           findsNothing);
       expect(find.text('Cambiar ubicación'), findsOneWidget);
     });
 
-    testWidgets('sin dirección lo dice en vez de dejarlo en blanco',
+    testWidgets('sin dirección ni coordenadas lo dice en vez de dejarlo en blanco',
         (tester) async {
       await tester.pumpWidget(pantalla(
         clienteComercio(),
@@ -296,7 +296,25 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('Todavía no cargaste tu dirección'), findsOneWidget);
+      expect(find.text('Todavía no has puesto tu dirección'), findsOneWidget);
+    });
+
+    // «Usar mi ubicación actual» guarda coordenadas y deja vacía la dirección
+    // escrita. La ficha decía entonces «Todavía no has puesto tu dirección»
+    // junto a un botón que decía «Cambiar ubicación»: el comercio se quedaba
+    // sin saber si su punto de retiro había quedado guardado.
+    testWidgets('con coordenadas y sin dirección no dice que falta la dirección',
+        (tester) async {
+      await tester.pumpWidget(pantalla(
+        clienteComercio(lat: 8.98, lng: -79.52),
+        UbicacionFalsa.en(const Coordenada(8.98, -79.52)),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Todavía no has puesto tu dirección'), findsNothing);
+      expect(find.text('Punto de retiro fijado en el mapa'), findsOneWidget);
+      // Y el botón sigue diciendo «Cambiar», que es lo coherente.
+      expect(find.text('Cambiar ubicación'), findsOneWidget);
     });
 
     testWidgets('guarda la dirección junto con las coordenadas tomadas',

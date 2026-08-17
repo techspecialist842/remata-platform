@@ -73,7 +73,9 @@ export class AuthService {
       // Admin accounts are never created through self-service registration —
       // only through AdminService.createAdmin() by an existing admin, or the
       // bootstrap seed script for the very first one.
-      throw new ForbiddenException('Admin accounts cannot be self-registered');
+      throw new ForbiddenException(
+        'Las cuentas de administrador no se crean desde el registro',
+      );
     }
 
     const fraudResult = await this.fraud.scoreEvent({
@@ -89,12 +91,15 @@ export class AuthService {
         correlationId: ctx.correlationId,
         ipAddress: ctx.ip,
       });
-      throw new ForbiddenException('Registration blocked');
+      // Vago a propósito: decir por qué se bloqueó le enseñaría a quien lo
+      // intenta qué tiene que cambiar para pasar. El motivo real queda en la
+      // auditoría, que es donde sirve.
+      throw new ForbiddenException('No se pudo crear la cuenta');
     }
 
     const existing = await this.users.findOne({ where: { email: dto.email } });
     if (existing) {
-      throw new ConflictException('Email already registered');
+      throw new ConflictException('Ese correo ya tiene una cuenta');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
@@ -154,7 +159,10 @@ export class AuthService {
         correlationId: ctx.correlationId,
         ipAddress: ctx.ip,
       });
-      throw new ForbiddenException('Login temporarily blocked');
+      // Igual que en el registro: sin motivo. Y «temporalmente» es lo único
+      // que conviene añadir, para que quien esté bloqueado por error no crea
+      // que perdió la cuenta.
+      throw new ForbiddenException('Acceso bloqueado temporalmente');
     }
 
     // Select mfaSecret explicitly: the entity marks it `select: false` by default.
@@ -170,7 +178,9 @@ export class AuthService {
         mfaSecret: true,
       },
     });
-    const genericError = new UnauthorizedException('Invalid credentials');
+    const genericError = new UnauthorizedException(
+      'Correo o contraseña incorrectos',
+    );
 
     // Always run the comparison, even with no matching account, so every
     // rejection costs the same wall-clock time (see TIMING_EQUALIZER_HASH).
@@ -188,7 +198,7 @@ export class AuthService {
         // Should not be reachable: isActive only flips true once MFA enrollment
         // completes (see AuthService.confirmMfaEnrollment). Fail closed anyway.
         throw new ForbiddenException(
-          'MFA enrollment incomplete for this admin account',
+          'Esta cuenta de administrador no terminó el alta de MFA',
         );
       }
       if (!dto.mfaToken) {
@@ -232,12 +242,12 @@ export class AuthService {
     const tokenHash = this.hashToken(rawToken);
     const stored = await this.refreshTokens.findOne({ where: { tokenHash } });
     if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException('La sesión no es válida o ya venció');
     }
 
     const user = await this.users.findOne({ where: { id: stored.userId } });
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException('La sesión no es válida o ya venció');
     }
 
     // Rotation: the presented token is single-use.
@@ -273,7 +283,9 @@ export class AuthService {
       }
       return payload.sub;
     } catch {
-      throw new UnauthorizedException('Invalid or expired enrollment token');
+      throw new UnauthorizedException(
+        'El enlace de alta no es válido o ya venció',
+      );
     }
   }
 
@@ -319,7 +331,7 @@ export class AuthService {
   ): Promise<void> {
     const paso = this.mfa.verificar(token, secret);
     if (paso === null) {
-      throw new UnauthorizedException('Invalid MFA code');
+      throw new UnauthorizedException('El código no es válido');
     }
 
     const fila = await this.users.findOne({
@@ -331,7 +343,7 @@ export class AuthService {
       if (paso <= fila.mfaLastStep) {
         // Mismo mensaje que un código inválido: distinguir «ya usado» de
         // «incorrecto» le diría a un atacante que acertó el código.
-        throw new UnauthorizedException('Invalid MFA code');
+        throw new UnauthorizedException('El código no es válido');
       }
     }
 

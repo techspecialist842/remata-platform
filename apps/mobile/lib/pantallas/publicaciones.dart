@@ -99,8 +99,8 @@ class _PantallaPublicacionesState extends State<PantallaPublicaciones> {
             if (pagina.items.isEmpty) {
               return const EstadoVacio(
                 icono: Icons.storefront_outlined,
-                titulo: 'Todavía no publicaste nada',
-                detalle: 'Creá tu primer rescate con el botón «Nueva».',
+                titulo: 'Todavía no has publicado nada',
+                detalle: 'Crea tu primer rescate con el botón «Nueva».',
               );
             }
 

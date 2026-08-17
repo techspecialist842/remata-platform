@@ -184,7 +184,7 @@ class _PantallaDetalleState extends State<PantallaDetalle> {
                       controller: _cupon,
                       textCapitalization: TextCapitalization.characters,
                       decoration: const InputDecoration(
-                        hintText: 'Ingresá tu código (opcional)',
+                        hintText: 'Escribe tu código (opcional)',
                         prefixIcon: Icon(Icons.local_offer_outlined),
                       ),
                     ),
@@ -323,7 +323,7 @@ class _DialogoConfirmacion extends StatelessWidget {
               ),
               const SizedBox(height: RTokens.s2),
               Text(
-                'Mostrá este código al retirar. Si no lo tenés a mano, alcanza '
+                'Muestra este código al retirar. Si no lo tienes a mano, alcanza '
                 'con el número de orden.',
                 style: RTokens.bodySm.copyWith(color: RTokens.textMuted),
                 textAlign: TextAlign.center,

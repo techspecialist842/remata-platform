@@ -92,7 +92,7 @@ class _PantallaCatalogoState extends State<PantallaCatalogo> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('¿Qué ofertas buscás hoy?',
+                  const Text('¿Qué ofertas buscas hoy?',
                       style: RTokens.titleL),
                   const SizedBox(height: RTokens.s3),
                   TextField(
@@ -133,7 +133,7 @@ class _PantallaCatalogoState extends State<PantallaCatalogo> {
                               size: 18,
                             ),
                       label: Text(
-                        _cerca != null ? 'Cerca tuyo (5 km)' : 'Cerca tuyo',
+                        _cerca != null ? 'Cerca de ti (5 km)' : 'Cerca de ti',
                       ),
                     ),
                   ),
@@ -171,10 +171,10 @@ class _PantallaCatalogoState extends State<PantallaCatalogo> {
                             ? Icons.location_off
                             : Icons.search_off,
                         titulo: _cerca != null
-                            ? 'Nada cerca tuyo ahora'
+                            ? 'Nada cerca de ti ahora'
                             : 'Sin ofertas por ahora',
                         detalle: _cerca != null
-                            ? 'No hay rescates a menos de 5 km. Probá quitando '
+                            ? 'No hay rescates a menos de 5 km. Prueba quitando '
                                 'el filtro de cercanía.'
                             : 'No encontramos rescates disponibles con esa '
                                 'búsqueda.',

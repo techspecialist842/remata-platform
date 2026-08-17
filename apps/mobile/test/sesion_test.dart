@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -120,6 +121,58 @@ void main() {
       await api.post('/api/v1/ordenes', cuerpo: {}, idempotencyKey: 'la-misma');
 
       expect(claves, ['la-misma', 'la-misma']);
+    });
+  });
+
+  // Sin conexión no es lo mismo que «el servidor dice que no».
+  //
+  // Antes cada pantalla lo adivinaba por su cuenta: al reservar salía «No se
+  // pudo completar la compra» —que suena a que el problema es la compra— y al
+  // entrar sí se hablaba de la conexión. Ahora lo decide el cliente, una vez.
+  group('sin conexión', () {
+    test('se distingue y lo dice, venga de donde venga', () async {
+      final api = ApiCliente(
+        baseUrl: 'https://t.test',
+        cliente: MockClient((_) async => throw const SocketException('sin red')),
+      )..establecerSesion('viejo', 'refresco-valido');
+
+      for (final peticion in [
+        () => api.get('/api/v1/ordenes/mias'),
+        () => api.post('/api/v1/ordenes', cuerpo: {}, idempotencyKey: 'k'),
+        () => api.patch('/api/v1/ordenes/1/cancelar', cuerpo: {}),
+      ]) {
+        try {
+          await peticion();
+          fail('debería haber lanzado');
+        } on ApiExcepcion catch (e) {
+          expect(e, isA<SinConexionExcepcion>());
+          expect(e.mensaje, contains('conexión'));
+        }
+      }
+    });
+
+    // Perder la red justo cuando toca renovar no puede costar la sesión: sería
+    // pedir la contraseña de nuevo por haber pasado por un túnel.
+    test('un corte durante la renovación no cierra la sesión', () async {
+      var llamadas = 0;
+      final api = ApiCliente(
+        baseUrl: 'https://t.test',
+        cliente: MockClient((p) async {
+          llamadas++;
+          if (p.url.path.endsWith('/auth/refresh')) {
+            throw const SocketException('sin red');
+          }
+          return respuesta(jsonEncode({'message': 'expirado'}), 401);
+        }),
+      )..establecerSesion('viejo', 'refresco-valido');
+
+      await expectLater(
+        api.get('/api/v1/ordenes/mias'),
+        throwsA(isA<SinConexionExcepcion>()),
+      );
+      expect(api.autenticado, isTrue,
+          reason: 'la sesión debe sobrevivir a un corte de red');
+      expect(llamadas, 2);
     });
   });
 

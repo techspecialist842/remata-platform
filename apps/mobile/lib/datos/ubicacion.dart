@@ -20,14 +20,14 @@ class UbicacionExcepcion implements Exception {
   /// Mensaje accionable: dice qué hacer, no solo qué falló.
   String get mensaje => switch (motivo) {
         FalloUbicacion.servicioApagado =>
-          'La ubicación está apagada. Activala para ver ofertas cerca tuyo.',
+          'La ubicación está apagada. Actívala para ver ofertas cerca de ti.',
         FalloUbicacion.permisoDenegado =>
           'Necesitamos tu ubicación para mostrarte lo que hay cerca.',
         FalloUbicacion.permisoDenegadoParaSiempre =>
-          'Bloqueaste el acceso a la ubicación. Podés habilitarlo desde los '
+          'Bloqueaste el acceso a la ubicación. Puedes habilitarlo desde los '
               'ajustes del sistema.',
         FalloUbicacion.noDisponible =>
-          'No pudimos obtener tu ubicación. Intentá de nuevo.',
+          'No pudimos obtener tu ubicación. Inténtalo de nuevo.',
       };
 
   @override

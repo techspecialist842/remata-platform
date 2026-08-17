@@ -15,6 +15,21 @@ class ApiExcepcion implements Exception {
   String toString() => mensaje;
 }
 
+/// No se pudo llegar al servidor: sin datos, sin wifi, o el servidor caído.
+///
+/// Existe como tipo aparte porque no es lo mismo que el servidor conteste que
+/// algo salió mal. Antes cada pantalla lo adivinaba por su cuenta y el
+/// resultado era desparejo: al reservar decía «No se pudo completar la compra»
+/// —que suena a que el problema es la compra— mientras al entrar sí hablaba de
+/// la conexión.
+///
+/// Al ser una `ApiExcepcion`, las pantallas que ya muestran `e.mensaje` dan el
+/// mensaje correcto sin tocar nada.
+class SinConexionExcepcion extends ApiExcepcion {
+  SinConexionExcepcion()
+      : super(0, 'No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.');
+}
+
 /// Thin HTTP client over the REMATA API.
 ///
 /// Deliberately hand-written rather than generated: the surface is small, and
@@ -85,17 +100,26 @@ class ApiCliente {
   /// request is retried once.
   ///
   /// Refresh tokens are single-use on the server: each renewal returns a new
-  /// pair, so the old one is deliberately discarded. Retried only once — if the
-  /// renewal itself fails, the session is genuinely over.
+  /// pair, so the old one is deliberately discarded.
+  ///
+  /// Se distingue «el servidor dice que no» de «no llegué al servidor». Lo
+  /// primero significa que la sesión terminó y hay que cerrarla. Lo segundo es
+  /// un problema de red: cerrar la sesión ahí obligaría a volver a escribir la
+  /// contraseña por haber pasado por un túnel, y el refresco todavía sirve.
   Future<bool> _renovarSesion() async {
     final refresh = _refreshToken;
     if (refresh == null) return false;
+    late final http.Response r;
     try {
-      final r = await _http.post(
+      r = await _http.post(
         Uri.parse('$baseUrl/api/v1/auth/refresh'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'refreshToken': refresh}),
       );
+    } catch (_) {
+      throw SinConexionExcepcion();
+    }
+    try {
       if (r.statusCode < 200 || r.statusCode >= 300) {
         cerrarSesion();
         return false;
@@ -107,6 +131,7 @@ class ApiCliente {
       );
       return true;
     } catch (_) {
+      // Contestó, pero con algo que no se entiende. Eso sí es sesión perdida.
       cerrarSesion();
       return false;
     }
@@ -164,7 +189,18 @@ class ApiCliente {
     Future<http.Response> Function() enviar, {
     bool reintentable = true,
   }) async {
-    var r = await enviar();
+    // No llegar al servidor se distingue aquí, una sola vez, en vez de que
+    // cada pantalla lo adivine. Así «no hay internet» dice siempre lo mismo,
+    // venga de reservar, de publicar o de entrar.
+    Future<http.Response> intentar() async {
+      try {
+        return await enviar();
+      } catch (_) {
+        throw SinConexionExcepcion();
+      }
+    }
+
+    var r = await intentar();
     if (r.statusCode != 401 || _refreshToken == null) return _procesar(r);
 
     if (!await _renovarSesion()) {
@@ -179,7 +215,7 @@ class ApiCliente {
         'hay que repetirla.',
       );
     }
-    return _procesar(await enviar());
+    return _procesar(await intentar());
   }
 
   Future<dynamic> get(String ruta, {Map<String, String>? query}) {
