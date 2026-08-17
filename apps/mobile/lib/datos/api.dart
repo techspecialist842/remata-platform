@@ -130,21 +130,56 @@ class ApiCliente {
     throw ApiExcepcion(r.statusCode, mensaje, correlationId: correlationId);
   }
 
-  /// Runs [enviar], and on a 401 renews the session once and retries.
+  /// Ejecuta [enviar] y, ante un 401, renueva la sesión y repite una vez.
   ///
-  /// The retry is skipped for requests carrying an Idempotency-Key: those are
-  /// state-changing, the server may already have applied the first attempt, and
-  /// replaying it under a new token would be reasoning about a request whose
-  /// outcome we do not know. Better to surface the failure.
+  /// El token de acceso dura quince minutos. Dejar la app abierta, atender el
+  /// mostrador y volver es lo normal, así que sin esto la sesión se moriría en
+  /// la mano del usuario.
+  ///
+  /// ## Por qué se repite también lo que lleva `Idempotency-Key`
+  ///
+  /// Antes no se repetía, por miedo a que el servidor ya hubiera aplicado el
+  /// primer intento. El miedo era infundado, y salía caro: como publicar y
+  /// reservar llevan clave de idempotencia, la sesión tampoco se renovaba con
+  /// ellas, y tras un cuarto de hora en reposo el comercio se quedaba sin
+  /// poder publicar —fallaba el primer intento, el segundo y el siguiente—
+  /// viendo solo la palabra «Unauthorized».
+  ///
+  /// Repetir es seguro por dos motivos independientes:
+  ///
+  /// 1. El 401 lo emite el guardia de autenticación, **antes** de que corra
+  ///    nada. Comprobado contra la API: un 401 no consume la clave de
+  ///    idempotencia, y esa misma clave con un token válido crea el recurso.
+  ///    O sea, un 401 es prueba de que la operación no se aplicó.
+  /// 2. La repetición lleva **la misma** clave de idempotencia. Aunque el
+  ///    primer intento hubiera llegado a aplicarse, el servidor devolvería el
+  ///    resultado guardado en vez de duplicar nada. Para eso existe la clave.
+  ///
+  /// [reintentable] queda para cortar la repetición donde no convenga; hoy no
+  /// la usa nadie.
+  ///
+  /// El refresco es de un solo uso: cada renovación devuelve un par nuevo. Se
+  /// intenta una vez —si la propia renovación falla, la sesión terminó—.
   Future<dynamic> _conReintento(
     Future<http.Response> Function() enviar, {
     bool reintentable = true,
   }) async {
     var r = await enviar();
-    if (r.statusCode == 401 && reintentable && _refreshToken != null) {
-      if (await _renovarSesion()) r = await enviar();
+    if (r.statusCode != 401 || _refreshToken == null) return _procesar(r);
+
+    if (!await _renovarSesion()) {
+      // El refresco tampoco valía: la sesión terminó de verdad. Se dice así,
+      // en vez de dejar salir el «Unauthorized» del servidor.
+      throw ApiExcepcion(401, 'Tu sesión se cerró. Hay que volver a entrar.');
     }
-    return _procesar(r);
+    if (!reintentable) {
+      throw ApiExcepcion(
+        401,
+        'Tu sesión venció y se acaba de renovar. La acción no se completó: '
+        'hay que repetirla.',
+      );
+    }
+    return _procesar(await enviar());
   }
 
   Future<dynamic> get(String ruta, {Map<String, String>? query}) {
@@ -163,7 +198,6 @@ class ApiCliente {
         headers: _cabeceras(idempotencyKey: idempotencyKey),
         body: cuerpo == null ? null : jsonEncode(cuerpo),
       ),
-      reintentable: idempotencyKey == null,
     );
   }
 

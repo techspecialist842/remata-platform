@@ -111,12 +111,24 @@ void main() {
       expect(llamadas.where((p) => p.endsWith('/auth/refresh')).length, 1);
     });
 
-    test('no reintenta una operación con Idempotency-Key', () async {
-      var intentos = 0;
+    // Si la renovación tampoco vale, la operación no se repite.
+    //
+    // Este caso decía antes «no reintenta una operación con Idempotency-Key»,
+    // que era la regla de entonces: se evitaba repetirlas por si el servidor ya
+    // las hubiera aplicado. El supuesto resultó falso —el 401 lo emite el
+    // guardia antes de que corra nada, comprobado contra la API— y salía caro:
+    // como tampoco se renovaba la sesión, el comercio se quedaba sin poder
+    // publicar tras un rato de inactividad. Hoy sí se repiten, con la misma
+    // clave. Lo que sigue en pie, y es lo que se protege aquí, es que una
+    // sesión muerta no genere intentos de más.
+    //
+    // El resto del comportamiento vive en sesion_test.dart.
+    test('con la sesión muerta no insiste con la operación', () async {
+      var operaciones = 0;
       final cliente = ApiCliente(
         baseUrl: 'https://ejemplo.test',
-        cliente: MockClient((_) async {
-          intentos++;
+        cliente: MockClient((req) async {
+          if (!req.url.path.endsWith('/auth/refresh')) operaciones++;
           return http.Response(jsonEncode({'message': 'expirado'}), 401);
         }),
       )..establecerSesion('viejo', 'viejoR');
@@ -125,7 +137,8 @@ void main() {
         cliente.post('/api/v1/ordenes', idempotencyKey: 'k'),
         throwsA(isA<ApiExcepcion>()),
       );
-      expect(intentos, 1, reason: 'no debe replayear una operación de estado');
+      expect(operaciones, 1, reason: 'sin sesión válida no hay nada que repetir');
+      expect(cliente.autenticado, isFalse);
     });
   });
 }
