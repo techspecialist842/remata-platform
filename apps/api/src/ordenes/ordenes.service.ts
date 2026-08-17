@@ -27,6 +27,7 @@ import {
 import { CuponesService } from './cupones.service';
 import { ReputacionService } from './reputacion.service';
 import { CrearOrdenDto } from './dto/crear-orden.dto';
+import { precioVigente } from '../catalogo/precio-dinamico';
 
 /**
  * Minutos que el comercio tiene para confirmar antes de que la reserva caduque
@@ -123,7 +124,12 @@ export class OrdenesService {
         throw new ConflictException('No hay unidades suficientes disponibles');
       }
 
-      const subtotalCentavos = rescate.precioCentavos * dto.cantidad;
+      // El precio que se cobra es el vigente ahora, no el que fijó el comercio:
+      // si el rescate tiene precio dinámico, ya habrá bajado. Se calcula aquí,
+      // en el servidor y dentro de la transacción, nunca se acepta del cliente
+      // — un precio que viene del cliente es un precio que el cliente elige.
+      const precioUnitario = precioVigente(rescate, ahora);
+      const subtotalCentavos = precioUnitario * dto.cantidad;
 
       let descuentoCentavos = 0;
       let cuponId: string | null = null;
@@ -171,7 +177,7 @@ export class OrdenesService {
           ordenId: orden.id,
           rescateId: rescate.id,
           tituloSnapshot: rescate.titulo,
-          precioUnitarioCentavos: rescate.precioCentavos,
+          precioUnitarioCentavos: precioUnitario,
           cantidad: dto.cantidad,
           totalLineaCentavos: subtotalCentavos,
         }),

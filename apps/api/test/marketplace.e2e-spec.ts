@@ -552,6 +552,131 @@ describe('Marketplace (e2e)', () => {
       .expect(400);
   });
 
+  // El precio dinámico solo sirve si lo que se cobra es el precio rebajado.
+  // Que el catálogo lo muestre y la orden cobre otro sería lo peor de ambos.
+  describe('precio dinámico', () => {
+    /** Publica con una ventana ya avanzada, para caer en el tramo del suelo. */
+    const publicarConSuelo = async (
+      sufijo: string,
+      precio: number,
+      suelo: number | null,
+      fraccionConsumida: number,
+    ) => {
+      const ahora = Date.now();
+      const ventana = 10 * 60 * 60 * 1000;
+      const creado = await http()
+        .post('/api/v1/catalogo/rescates')
+        .set('Authorization', `Bearer ${comercioToken}`)
+        .set('Idempotency-Key', key(`pd-${sufijo}`))
+        .send({
+          titulo: `Dinamico ${sufijo} ${runId}`,
+          precioCentavos: precio,
+          ...(suelo !== null ? { precioMinimoCentavos: suelo } : {}),
+          cantidadTotal: 3,
+          validoDesde: new Date(
+            ahora - ventana * fraccionConsumida,
+          ).toISOString(),
+          validoHasta: new Date(
+            ahora + ventana * (1 - fraccionConsumida),
+          ).toISOString(),
+        })
+        .expect(201);
+
+      const id = asRescate(creado.body).id;
+      await http()
+        .patch(`/api/v1/catalogo/rescates/${id}/publicar`)
+        .set('Authorization', `Bearer ${comercioToken}`)
+        .expect(200);
+      return id;
+    };
+
+    it('el catálogo muestra el precio vigente junto al fijado', async () => {
+      // 90% de la ventana consumida: queda un 10%, tramo del suelo.
+      const id = await publicarConSuelo('vigente', 1000, 400, 0.9);
+
+      const r = await http().get(`/api/v1/catalogo/rescates/${id}`).expect(200);
+      const cuerpo = r.body as {
+        precioCentavos: number;
+        precioVigenteCentavos: number;
+      };
+
+      // Los dos viajan: uno para cobrar, otro para enseñar el ahorro.
+      expect(cuerpo.precioCentavos).toBe(1000);
+      expect(cuerpo.precioVigenteCentavos).toBe(400);
+    });
+
+    it('la orden cobra el precio rebajado, no el fijado', async () => {
+      const id = await publicarConSuelo('cobro', 1000, 400, 0.9);
+
+      const orden = await http()
+        .post('/api/v1/ordenes')
+        .set('Authorization', `Bearer ${compradorToken}`)
+        .set('Idempotency-Key', key('pd-orden'))
+        .send({ rescateId: id, cantidad: 2 })
+        .expect(201);
+
+      // 2 × 400, no 2 × 1000.
+      expect(asOrden(orden.body).subtotalCentavos).toBe(800);
+      expect(asOrden(orden.body).totalCentavos).toBe(800);
+    });
+
+    it('la línea de la orden guarda el precio que se cobró', async () => {
+      const id = await publicarConSuelo('linea', 1000, 400, 0.9);
+      await http()
+        .post('/api/v1/ordenes')
+        .set('Authorization', `Bearer ${compradorToken}`)
+        .set('Idempotency-Key', key('pd-linea'))
+        .send({ rescateId: id, cantidad: 1 })
+        .expect(201);
+
+      const mias = await http()
+        .get('/api/v1/ordenes/mias')
+        .set('Authorization', `Bearer ${compradorToken}`)
+        .expect(200);
+
+      const linea = (
+        mias.body as {
+          items: {
+            items: { tituloSnapshot: string; precioUnitarioCentavos: number }[];
+          }[];
+        }
+      ).items
+        .flatMap((o) => o.items)
+        .find((l) => l.tituloSnapshot === `Dinamico linea ${runId}`);
+
+      // La copia guarda lo pactado, no el precio de catálogo.
+      expect(linea?.precioUnitarioCentavos).toBe(400);
+    });
+
+    it('sin suelo el precio no se mueve', async () => {
+      const id = await publicarConSuelo('sinsuelo', 1000, null, 0.9);
+
+      const r = await http().get(`/api/v1/catalogo/rescates/${id}`).expect(200);
+      expect(
+        (r.body as { precioVigenteCentavos: number }).precioVigenteCentavos,
+      ).toBe(1000);
+    });
+
+    it('rechaza un suelo mayor o igual al precio', async () => {
+      const ahora = Date.now();
+      for (const suelo of [1000, 1200]) {
+        await http()
+          .post('/api/v1/catalogo/rescates')
+          .set('Authorization', `Bearer ${comercioToken}`)
+          .set('Idempotency-Key', key(`pd-malo-${suelo}`))
+          .send({
+            titulo: `Suelo malo ${suelo} ${runId}`,
+            precioCentavos: 1000,
+            precioMinimoCentavos: suelo,
+            cantidadTotal: 1,
+            validoDesde: new Date(ahora - 60_000).toISOString(),
+            validoHasta: new Date(ahora + 3_600_000).toISOString(),
+          })
+          .expect(400);
+      }
+    });
+  });
+
   it('impide que un comprador publique rescates (control de rol)', async () => {
     await http()
       .post('/api/v1/catalogo/rescates')

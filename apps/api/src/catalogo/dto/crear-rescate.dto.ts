@@ -46,6 +46,18 @@ export class CrearRescateDto {
   @Min(1)
   precioOriginalCentavos?: number;
 
+  /**
+   * Suelo del precio dinámico. Si se omite, el precio no baja solo.
+   *
+   * Es opt-in a propósito: nadie debe encontrarse con que su precio cambia sin
+   * haberlo pedido.
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  precioMinimoCentavos?: number;
+
   @Type(() => Number)
   @IsInt()
   @Min(1)
