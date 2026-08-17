@@ -51,6 +51,27 @@ export class Resena {
   @Column({ name: 'respondida_at', type: 'timestamptz', nullable: true })
   respondidaAt: Date | null;
 
+  /**
+   * Señales de posible amaño detectadas al crearse. Nunca ocultan la reseña ni
+   * la excluyen de la nota: solo la ponen delante de un administrador.
+   *
+   * Se guardan en vez de recalcularse porque describen el momento de la
+   * compra, y ese momento no vuelve: dentro de un mes la cuenta ya no será
+   * nueva ni la ráfaga existirá.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  senales: string[] | null;
+
+  /**
+   * Marcada para revisión.
+   *
+   * El índice es parcial, solo sobre las marcadas: la cola de revisión no
+   * pregunta nunca por las demás, y esas son la práctica totalidad de la tabla.
+   */
+  @Index('IDX_resenas_sospechosa', { where: '"sospechosa"' })
+  @Column({ default: false })
+  sospechosa: boolean;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

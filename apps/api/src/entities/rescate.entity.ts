@@ -56,6 +56,24 @@ export class Rescate {
   @Column({ name: 'precio_original_centavos', type: 'integer', nullable: true })
   precioOriginalCentavos: number | null;
 
+  /**
+   * Suelo del precio dinámico. Nulo = sin precio dinámico.
+   *
+   * Es opt-in a propósito. Un comercio que no quiera que su precio baje solo no
+   * debe encontrarse con que baja: fijarlo es una decisión suya, y el suelo es
+   * la garantía de que nunca vende por debajo de lo que le cuesta.
+   *
+   * Cuando está fijado, el precio baja por tramos conforme se acerca el
+   * vencimiento, entre `precioCentavos` y este suelo. Ver
+   * `precioVigente()` en catalogo.service.
+   */
+  @Column({
+    name: 'precio_minimo_centavos',
+    type: 'integer',
+    nullable: true,
+  })
+  precioMinimoCentavos: number | null;
+
   @Column({ length: 3, default: 'USD' })
   moneda: string;
 

@@ -9,6 +9,7 @@ import { CatalogoModule } from '../catalogo/catalogo.module';
 import { AdminController } from './admin.controller';
 import { AuthModule } from '../auth/auth.module';
 import { AuditModule } from '../audit/audit.module';
+import { OrdenesModule } from '../ordenes/ordenes.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AuditModule } from '../audit/audit.module';
     AuthModule,
     CatalogoModule,
     AuditModule,
+    OrdenesModule,
   ],
   controllers: [AdminController],
   providers: [AdminService, ModeracionService],

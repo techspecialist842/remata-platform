@@ -27,6 +27,7 @@ import { SetUserActiveDto } from './dto/set-user-active.dto';
 import { RetirarRescateDto } from './dto/moderar-rescate.dto';
 import { ModeracionService } from './moderacion.service';
 import { ReportesService } from '../catalogo/reportes.service';
+import { ResenasService } from '../ordenes/resenas.service';
 import { OrdenStatus, RescateStatus } from '../common/enums/marketplace.enum';
 
 @ApiTags('admin')
@@ -40,6 +41,7 @@ export class AdminController {
     private readonly admin: AdminService,
     private readonly moderacion: ModeracionService,
     private readonly reportes: ReportesService,
+    private readonly resenas: ResenasService,
   ) {}
 
   @Post('admins')
@@ -88,6 +90,17 @@ export class AdminController {
     @Query('status') status?: RescateStatus,
   ) {
     return this.moderacion.listarRescates(status, query.page, query.pageSize);
+  }
+
+  @Get('resenas-marcadas')
+  @ApiOperation({
+    summary: 'Reseñas marcadas como posiblemente amañadas',
+    description:
+      'Estar marcada no es estar descartada: siguen contando para la nota hasta que una persona decida lo contrario.',
+  })
+  @ApiErrorResponses(400)
+  resenasMarcadas(@Query() query: PaginationQueryDto) {
+    return this.resenas.marcadas(query.page, query.pageSize);
   }
 
   @Get('reportes')

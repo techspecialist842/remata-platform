@@ -13,6 +13,7 @@ import { AuditLogService } from '../audit/audit-log.service';
 import { CrearRescateDto } from './dto/crear-rescate.dto';
 import { BuscarRescatesDto } from './dto/buscar-rescates.dto';
 import { UbicacionComercioDto } from './dto/ubicacion-comercio.dto';
+import { precioVigente } from './precio-dinamico';
 
 /** Un grado de latitud son ~111 km en cualquier punto del planeta. */
 const KM_POR_GRADO_LAT = 111.32;
@@ -37,6 +38,20 @@ const HAVERSINE_KM = `(
     ))
   )
 )`;
+
+/**
+ * Añade a la publicación el precio al que se vende ahora mismo.
+ *
+ * Se calcula al leer, no se guarda: el precio depende del reloj, y una columna
+ * con el precio de hace un rato es una columna que miente. `precioCentavos`
+ * sigue siendo el que fijó el comercio, para poder enseñar los dos y que se vea
+ * el ahorro.
+ */
+function conPrecioVigente(r: Rescate): Rescate & {
+  precioVigenteCentavos: number;
+} {
+  return { ...r, precioVigenteCentavos: precioVigente(r) };
+}
 
 export interface PaginatedRescates {
   // La distancia solo viaja cuando se buscó por cercanía; en el resto de
@@ -138,6 +153,17 @@ export class CatalogoService {
         'precioOriginalCentavos debe ser mayor al precio de venta',
       );
     }
+    // Un suelo por encima del precio no es un error tipográfico inofensivo: si
+    // se aceptara, el comercio creería haber puesto un mínimo y estaría
+    // pidiendo un aumento. Se rechaza en vez de ignorarse en silencio.
+    if (
+      dto.precioMinimoCentavos !== undefined &&
+      dto.precioMinimoCentavos >= dto.precioCentavos
+    ) {
+      throw new BadRequestException(
+        'precioMinimoCentavos debe ser menor al precio de venta',
+      );
+    }
 
     // Starts as BORRADOR: publishing is a separate, deliberate action, so a
     // half-written listing is never visible to buyers.
@@ -150,6 +176,7 @@ export class CatalogoService {
         categoria: dto.categoria ?? null,
         precioCentavos: dto.precioCentavos,
         precioOriginalCentavos: dto.precioOriginalCentavos ?? null,
+        precioMinimoCentavos: dto.precioMinimoCentavos ?? null,
         cantidadTotal: dto.cantidadTotal,
         cantidadDisponible: dto.cantidadTotal,
         validoDesde: desde,
@@ -305,14 +332,15 @@ export class CatalogoService {
     // getRawAndEntities devuelve ambas cosas y se emparejan por posición.
     const total = await qb.getCount();
     if (!cerca) {
-      return { items: await qb.getMany(), total, page, pageSize };
+      const items = (await qb.getMany()).map(conPrecioVigente);
+      return { items, total, page, pageSize };
     }
 
     const { entities, raw } = await qb.getRawAndEntities<{
       distancia_km: string;
     }>();
     const items = entities.map((r, i) => ({
-      ...r,
+      ...conPrecioVigente(r),
       distanciaKm: Math.round(Number(raw[i].distancia_km) * 100) / 100,
     }));
     return { items, total, page, pageSize };
@@ -334,12 +362,12 @@ export class CatalogoService {
     return { lat, lng, radioKm: radioKm ?? RADIO_KM_POR_DEFECTO };
   }
 
-  async verPublicado(id: string): Promise<Rescate> {
+  async verPublicado(id: string) {
     const rescate = await this.rescates.findOne({ where: { id } });
     if (!rescate || rescate.status !== RescateStatus.PUBLICADO) {
       throw new NotFoundException('Rescate no encontrado');
     }
-    return rescate;
+    return conPrecioVigente(rescate);
   }
 
   /** Everything the merchant owns, in any state — their own management view. */

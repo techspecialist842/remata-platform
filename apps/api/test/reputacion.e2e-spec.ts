@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { configureApp } from './../src/bootstrap';
+import { ResenasService } from './../src/ordenes/resenas.service';
 
 // Reputación: nota ponderada y derecho de réplica.
 //
@@ -14,6 +15,11 @@ import { configureApp } from './../src/bootstrap';
 
 interface TokensBody {
   accessToken: string;
+}
+interface ResenaBody {
+  id: string;
+  senales: string[] | null;
+  sospechosa: boolean;
 }
 interface Resumen {
   promedio: number | null;
@@ -68,12 +74,19 @@ describe('Reputación (e2e)', () => {
     await app.close();
   });
 
-  /** Compra, entrega y reseña con la nota indicada. Devuelve la reseña. */
+  /** Compra, entrega y reseña con la nota indicada. Devuelve el id de la reseña. */
   const cicloConNota = async (
     compradorToken: string,
     sufijo: string,
     calificacion: number,
-  ) => {
+  ) => (await cicloConNotaCompleta(compradorToken, sufijo, calificacion)).id;
+
+  /** Igual, pero devuelve la reseña entera: señales incluidas. */
+  const cicloConNotaCompleta = async (
+    compradorToken: string,
+    sufijo: string,
+    calificacion: number,
+  ): Promise<ResenaBody> => {
     const ahora = Date.now();
     const creado = await http()
       .post('/api/v1/catalogo/rescates')
@@ -114,7 +127,7 @@ describe('Reputación (e2e)', () => {
       .set('Authorization', `Bearer ${compradorToken}`)
       .send({ calificacion, comentario: `nota ${calificacion}` })
       .expect(201);
-    return (resena.body as { id: string }).id;
+    return resena.body as ResenaBody;
   };
 
   const resumen = async () => {
@@ -249,6 +262,75 @@ describe('Reputación (e2e)', () => {
       expect(despues.promedio).toBe(conNota.promedio);
       expect(despues.promedioPonderado).toBe(conNota.promedioPonderado);
       expect(despues.totalResenas).toBe(antes.totalResenas + 1);
+    });
+  });
+
+  // Señales de reseña posiblemente amañada.
+  //
+  // El ataque que buscan no es el spam —reseñar exige haber comprado y que el
+  // comercio haya entregado, o sea dinero— sino el comercio que se compra a sí
+  // mismo desde una segunda cuenta para ponerse cinco estrellas.
+  describe('señales de reseña amañada', () => {
+    it('marca la primera reseña de una cuenta recién creada', async () => {
+      const novato = await http()
+        .post('/api/v1/auth/register')
+        .set('Idempotency-Key', key('novato'))
+        .send({
+          email: `rep-novato-${runId}@test.com`,
+          password: 'password123',
+        })
+        .expect(201);
+
+      const resena = await cicloConNotaCompleta(
+        (novato.body as TokensBody).accessToken,
+        'novato',
+        5,
+      );
+
+      // Cuenta creada hace segundos, una sola compra, y dada de alta desde la
+      // misma dirección que el comercio: tres señales.
+      expect(resena.senales).toEqual(
+        expect.arrayContaining(['cuenta_nueva', 'unica_compra']),
+      );
+      expect(resena.sospechosa).toBe(true);
+    });
+
+    // Lo que separa esto de una censura automática.
+    //
+    // Excluir una reseña marcada le daría a un atacante la forma de suprimir
+    // críticas legítimas: bastaría con hacerlas parecer sospechosas —comprar
+    // desde la misma red que el reseñador, por ejemplo—. Marcar sí; decidir,
+    // una persona.
+    it('estar marcada no descuenta la nota', async () => {
+      const antes = await resumen();
+
+      const critico = await http()
+        .post('/api/v1/auth/register')
+        .set('Idempotency-Key', key('critico'))
+        .send({
+          email: `rep-critico-${runId}@test.com`,
+          password: 'password123',
+        })
+        .expect(201);
+
+      const resena = await cicloConNotaCompleta(
+        (critico.body as TokensBody).accessToken,
+        'critico',
+        1,
+      );
+      expect(resena.sospechosa).toBe(true);
+
+      const despues = await resumen();
+      expect(despues.totalResenas).toBe(antes.totalResenas + 1);
+      // El 1 entra en la media igual que cualquier otra nota.
+      expect(despues.promedio!).toBeLessThan(antes.promedio!);
+    });
+
+    it('la reseña marcada llega a la cola de revisión', async () => {
+      const cola = await app.get(ResenasService).marcadas(1, 100);
+
+      expect(cola.total).toBeGreaterThan(0);
+      expect(cola.items.every((r) => r.sospechosa)).toBe(true);
     });
   });
 });
