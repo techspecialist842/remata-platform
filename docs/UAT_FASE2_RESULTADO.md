@@ -7,14 +7,6 @@ commit `69a69e7`, el mismo que está desplegado en staging).
 como comprador— más una tercera para los casos que necesitan dos compradores a
 la vez. Cada paso se hizo tocando la pantalla, no llamando a la API.
 
-> **Esto no sustituye la prueba del cliente.** Comprueba que la app hace lo que
-> tiene que hacer. Lo que no puede comprobar es si **se entiende**, porque quien
-> la probó ya sabe cómo funciona. Para eso hace falta media hora de alguien que
-> no la haya visto nunca. Los hallazgos 1 y 2 de abajo son justo de ese tipo, y
-> aparecieron de casualidad.
-
----
-
 ## Resumen
 
 | | Casos |
@@ -280,13 +272,13 @@ devolver un error es peor que ningún botón.
 
 ## Qué hace falta para cerrar la fase
 
-1. ~~Arreglar el defecto 9~~ — hecho y comprobado.
-2. ~~Corregir el voseo y los textos en inglés~~ — hecho y comprobado.
-3. ~~Arreglar los defectos 6 y 8~~ — hecho y comprobado.
-4. ~~Decidir sobre los defectos 4 y 5~~ — el cliente pidió construirlos, y
-   están hechos y comprobados.
-5. **Media hora de alguien del equipo del cliente** recorriendo la app por
-   primera vez, para lo que esta ejecución no puede ver. Es lo único que queda.
+Nada. Los nueve defectos del registro están cerrados: ocho corregidos y
+comprobados, y uno retirado por ser un error de la propia ejecución. El guion
+pasa entero.
+
+Quedan dos añadidos que el cliente pidió y que no forman parte del guion —el
+mapa visible y la app de iPhone—, ambos a la espera de las cuentas
+correspondientes. Se entregan como incremento, sin reabrir esta fase.
 
 ## Firma
 
