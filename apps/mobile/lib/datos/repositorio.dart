@@ -144,6 +144,29 @@ class Repositorio {
     );
   }
 
+  /// Reportar una publicación.
+  ///
+  /// Reportar abre un expediente, no ejecuta la pena: la oferta sigue en el
+  /// catálogo hasta que una persona la revise. Si bastara una denuncia para
+  /// tumbar una oferta, hundir a la competencia costaría un clic.
+  ///
+  /// La misma persona no puede reportar dos veces lo mismo; el servidor
+  /// responde 409.
+  Future<void> reportarRescate(
+    String rescateId, {
+    required MotivoReporte motivo,
+    String? nota,
+  }) async {
+    await api.post(
+      '/api/v1/catalogo/rescates/$rescateId/reportar',
+      idempotencyKey: _clave('rep'),
+      cuerpo: {
+        'motivo': motivo.valor,
+        if (nota != null && nota.trim().isNotEmpty) 'nota': nota.trim(),
+      },
+    );
+  }
+
   /// [motivo] lo decide quien cancela: el comprador solo puede alegar
   /// 'comprador'; el comercio, 'comercio' o 'no_show'. El servidor lo verifica.
   Future<void> cancelarOrden(String id, {String motivo = 'comprador'}) async {
@@ -241,6 +264,29 @@ class Repositorio {
     final r = await api.get('/api/v1/ordenes/reputacion/$sujetoId')
         as Map<String, dynamic>;
     return Reputacion.desdeJson(r);
+  }
+
+  /// Las reseñas que recibió mi comercio, la más reciente primero.
+  ///
+  /// El comercio sale de la sesión: no se manda identificador, así que no hay
+  /// forma de pedir las de otro.
+  Future<Pagina<ResenaRecibida>> misResenas({int pagina = 1}) async {
+    final r = await api.get('/api/v1/ordenes/resenas/mias', query: {
+      'page': '$pagina',
+      'pageSize': '20',
+    }) as Map<String, dynamic>;
+    return Pagina.desdeJson(r, ResenaRecibida.desdeJson);
+  }
+
+  /// Responder a una reseña. Una sola vez, y no cambia la nota: la
+  /// calificación es de quien compró. El servidor responde 409 al segundo
+  /// intento.
+  Future<void> responderResena(String resenaId, String texto) async {
+    await api.post(
+      '/api/v1/ordenes/resenas/$resenaId/responder',
+      idempotencyKey: _clave('resp'),
+      cuerpo: {'texto': texto.trim()},
+    );
   }
 
   /// Perfil y reputación en una sola espera.

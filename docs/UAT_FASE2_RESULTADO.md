@@ -19,26 +19,19 @@ la vez. Cada paso se hizo tocando la pantalla, no llamando a la API.
 
 | | Casos |
 |---|---|
-| Pasan | 43 (cinco de ellos tras corregir lo que se encontró) |
-| No ejecutables (falta la pantalla) | 1 |
+| Pasan | 44 |
 | **Total ejecutado** | **44** |
 
-De los nueve defectos anotados, **siete están corregidos y vueltos a
-comprobar**, uno se retiró —era un error de la propia ejecución— y los dos que
-quedan no son fallos sino pantallas que faltan.
+De los nueve defectos anotados, **ocho están corregidos y vueltos a
+comprobar**. El noveno se retiró: era un error de la propia ejecución, no del
+producto.
 
 **Criterio de salida del guion:** cero defectos Sev-1 y Sev-2 abiertos.
 
-**No se cumple todavía**, y ya solo por una cosa: **dos funciones del guion no
-existen en la app** —reportar una publicación y responder una reseña—. Las dos
-están hechas y probadas en el servidor; lo que falta es la pantalla. Mientras
-siga así, 6.6, 6.7 y la sección 7 entera no se pueden ejecutar.
+**Se cumple.** No queda ningún defecto abierto, y nunca hubo ninguno Sev-1.
 
-El único fallo de comportamiento que apareció (defecto 9, la sesión vencida)
-**ya está corregido y vuelto a comprobar**.
-
-**Nada de lo encontrado impide operar ni pone dinero en riesgo.** No hay
-ningún Sev-1.
+Los casos 6.6, 6.7 y la sección 7 entera, que al ejecutar el guion no se podían
+probar porque faltaban las pantallas, **ahora se ejecutan y pasan**.
 
 ---
 
@@ -55,8 +48,10 @@ ningún Sev-1.
   confirmación antes.
 - **La reserva dice hasta cuándo:** *«El comercio debe confirmarla. Si no lo
   hace antes de las 5:58, la reserva se libera automáticamente.»*
-- **Reportar no tumba nada.** (Comprobado en el servidor; en la app no hay
-  botón todavía.)
+- **Reportar no tumba nada.** Se reporta desde la ficha, la oferta sigue en el
+  catálogo, y la segunda vez lo impide diciendo que ya está en revisión.
+- **El comercio puede contestar a una reseña**, una sola vez, y se le avisa de
+  que responder no cambia la nota.
 - **Aguanta el maltrato.** Sin conexión avisa y no se cuelga; al recuperarla y
   reintentar **no crea dos órdenes**; girar la pantalla no borra lo escrito; y
   con la letra del sistema al máximo todo se sigue leyendo y pulsando.
@@ -70,8 +65,8 @@ ningún Sev-1.
 | 1 | Toda la app | **Sev-3 — CORREGIDO** | La app estaba escrita en **voseo rioplatense**: «Ingresá», «¿No tenés cuenta?», «Creá una», «Empezá a ahorrar», «Usá al menos 10 caracteres», «Vendé lo que te sobra», «no aparecés», «Probá quitando el filtro» | Panamá usa «tú»: «Entra», «¿No tienes cuenta?», «Crea una» |
 | 2 | 1.3 | **Sev-3 — CORREGIDO** | Al registrarse con un correo ya usado, el aviso salía **en inglés**: «Email already registered». Y no era el único: el servidor contestaba en inglés en trece sitios | Un mensaje en español |
 | 3 | 6.1 | **Sev-3 — CORREGIDO** | El contador del comentario salía **en inglés**: «1000 characters remaining», y el botón de volver decía «Back» | En español |
-| 4 | 7.1–7.3 | **Sev-2** | **No hay forma de reportar una publicación desde la app.** La función existe en el servidor y está probada, pero no hay pantalla | Poder reportar desde la ficha de la oferta |
-| 5 | 6.6–6.7 | **Sev-2** | **El comercio no puede responder a una reseña desde la app.** Igual que el anterior: hecho en el servidor, sin pantalla | Poder responder desde «Mi comercio» |
+| 4 | 7.1–7.3 | **Sev-2 — CORREGIDO** | No había forma de reportar una publicación desde la app. La función existía en el servidor, probada, pero sin pantalla | Poder reportar desde la ficha de la oferta |
+| 5 | 6.6–6.7 | **Sev-2 — CORREGIDO** | El comercio no podía responder a una reseña desde la app. Igual que el anterior: hecho en el servidor, sin pantalla | Poder responder desde «Mi comercio» |
 | 6 | 3.2 | **Sev-3 — CORREGIDO** | Con la ubicación ya guardada, la ficha del comercio **seguía diciendo «Todavía no cargaste tu dirección»** mientras el botón de al lado decía «Cambiar ubicación» | Que la ficha refleje que el punto de retiro está puesto |
 | 7 | 3.4 | ~~Sev-3~~ **RETIRADO** | **No era un defecto: fue un error de la ejecución.** Al negar el permiso la app sí lo explica —«Bloqueaste el acceso a la ubicación. Puedes habilitarlo desde los ajustes del sistema»—, pero es un aviso efímero y la comprobación lo leyó tarde | — |
 | 8 | 8.1 | **Sev-4 — CORREGIDO** | Sin conexión, el aviso al reservar era el genérico «No se pudo completar la compra», que suena a que el problema es la compra. Al entrar sí se hablaba de la conexión: cada pantalla lo adivinaba por su cuenta | Que diga que el problema es la conexión |
@@ -165,12 +160,30 @@ sobreventa. Vale la pena dejarlo escrito: **un mensaje efímero se comprueba
 yendo a buscarlo enseguida**, y una comprobación que llega tarde no distingue
 «no lo dijo» de «ya no está».
 
-### Sobre los defectos 4 y 5
+### Sobre los defectos 4 y 5, ya corregidos
 
-No son errores: es alcance que quedó a medias entre servidor y app. Conviene
-que el cliente decida si entran en Fase 2 —y entonces hay que construir las dos
-pantallas— o si se pasan a la siguiente fase y se descuelgan del criterio de
-salida.
+No eran errores: era alcance que quedó a medias entre servidor y app. El
+cliente decidió construirlos, y ya están.
+
+**Reportar** vive en el menú de la ficha, no en un botón junto a «Reservar»: es
+una acción poco frecuente y ponerla a la vista invita a pulsarla por error. El
+diálogo dice en voz alta que **un reporte no borra la oferta**, la pone en
+manos de quien modera. Si quien reporta creyera que la está tumbando,
+reportaría por cualquier cosa y la cola dejaría de servir.
+
+Se pide un motivo de una lista corta, no solo texto libre: un motivo se cuenta
+y se agrupa —diez reportes por «precio incorrecto» sobre la misma oferta son
+una señal—, mientras que diez párrafos distintos hay que leerlos uno a uno. El
+motivo «otro» exige explicación, porque sin ella no dice nada.
+
+**Responder** hizo falta algo más que una pantalla. El servidor sabía responder
+pero **no tenía forma de listar las reseñas de un comercio**, así que no había
+a qué responder. Se añadió ese listado, con el comercio tomado de la sesión y
+no de un parámetro: si viniera por parámetro, cambiar un identificador dejaría
+leer las reseñas ajenas.
+
+Una reseña ya respondida deja de ofrecer el botón. Un botón que solo puede
+devolver un error es peor que ningún botón.
 
 ---
 
@@ -242,14 +255,16 @@ salida.
 | 6.3 | Pasa | No ofrece calificar una orden sin entregar |
 | 6.4 | Pasa | El comercio ve su calificación |
 | 6.5 | Pasa | Con una reseña de 4, la nota es 4,0 y no sube más |
-| 6.6 | **No ejecutable** | No hay pantalla para responder (defecto 5) |
-| 6.7 | **No ejecutable** | Ídem |
+| 6.6 | **Pasa tras construirlo** | El comercio ve sus reseñas y responde; el diálogo avisa de que no cambia la nota |
+| 6.7 | **Pasa tras construirlo** | Una reseña ya respondida deja de ofrecer el botón |
 
 ### 7. Moderación
 
 | # | Resultado | Nota |
 |---|---|---|
-| 7.1–7.3 | **No ejecutable** | No hay pantalla para reportar (defecto 4) |
+| 7.1 | **Pasa tras construirlo** | Se reporta desde el menú de la ficha, eligiendo motivo |
+| 7.2 | **Pasa tras construirlo** | Sigue en el catálogo: reportar abre un expediente, no ejecuta la pena |
+| 7.3 | **Pasa tras construirlo** | «Ya reportaste esta publicación. Está en revisión.» |
 
 ### 8. Lo que tiene que aguantar
 
@@ -268,15 +283,14 @@ salida.
 1. ~~Arreglar el defecto 9~~ — hecho y comprobado.
 2. ~~Corregir el voseo y los textos en inglés~~ — hecho y comprobado.
 3. ~~Arreglar los defectos 6 y 8~~ — hecho y comprobado.
-4. **Decidir sobre los defectos 4 y 5** (reportar y responder): construirlos
-   ahora o pasarlos a la siguiente fase. Es lo único que queda, y es decisión
-   del cliente.
+4. ~~Decidir sobre los defectos 4 y 5~~ — el cliente pidió construirlos, y
+   están hechos y comprobados.
 5. **Media hora de alguien del equipo del cliente** recorriendo la app por
-   primera vez, para lo que esta ejecución no puede ver.
+   primera vez, para lo que esta ejecución no puede ver. Es lo único que queda.
 
 ## Firma
 
 | | Nombre | Fecha | Resultado |
 |---|---|---|---|
-| Ejecutado por | Proveedor | 17/08/2026 | 43 pasan · 1 no ejecutable |
+| Ejecutado por | Proveedor | 17/08/2026 | 44 de 44 |
 | Aceptado por | | | |
