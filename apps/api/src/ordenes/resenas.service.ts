@@ -152,6 +152,25 @@ export class ResenasService {
     return { items, total, page, pageSize };
   }
 
+  /**
+   * Las reseñas del comercio que pregunta, para su propio panel.
+   *
+   * Existe porque sin ella el comercio no puede ejercer su derecho de
+   * réplica: responder estaba construido y probado, pero no había forma de
+   * ver a qué responder.
+   *
+   * El identificador del comercio se resuelve aquí desde la cuenta y no se
+   * acepta por parámetro. Si se aceptara, cualquier comercio podría leer las
+   * reseñas de otro con solo cambiar un identificador en la petición.
+   */
+  async mias(userId: string, page = 1, pageSize = 20) {
+    const merchant = await this.merchants.findOne({ where: { userId } });
+    if (!merchant) {
+      throw new ForbiddenException('La cuenta no tiene un perfil de comercio');
+    }
+    return this.delComercio(merchant.id, page, pageSize);
+  }
+
   async delComercio(merchantId: string, page = 1, pageSize = 20) {
     const [items, total] = await this.resenas.findAndCount({
       where: { merchantId },

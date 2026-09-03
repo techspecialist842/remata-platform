@@ -270,6 +270,56 @@ describe('Reputación (e2e)', () => {
   // El ataque que buscan no es el spam —reseñar exige haber comprado y que el
   // comercio haya entregado, o sea dinero— sino el comercio que se compra a sí
   // mismo desde una segunda cuenta para ponerse cinco estrellas.
+  // Sin este listado el derecho de réplica no existe en la práctica:
+  // responder estaba construido y probado, pero el comercio no tenía forma de
+  // ver a qué responder.
+  describe('el comercio ve sus reseñas', () => {
+    it('lista las suyas, con la respuesta si ya la dio', async () => {
+      const r = await http()
+        .get('/api/v1/ordenes/resenas/mias')
+        .set('Authorization', `Bearer ${comercioToken}`)
+        .expect(200);
+
+      const body = r.body as {
+        items: { id: string; calificacion: number; respuesta: string | null }[];
+        total: number;
+      };
+      expect(body.total).toBeGreaterThan(0);
+      expect(body.items.every((x) => typeof x.calificacion === 'number')).toBe(
+        true,
+      );
+      // Alguna quedó respondida en las pruebas de réplica de más arriba.
+      expect(body.items.some((x) => x.respuesta !== null)).toBe(true);
+    });
+
+    // El comercio sale de la sesión, no de un parámetro. Si saliera de un
+    // parámetro, cambiar un identificador dejaría leer las reseñas ajenas.
+    it('otro comercio no ve las de este', async () => {
+      const otro = await http()
+        .post('/api/v1/auth/register')
+        .set('Idempotency-Key', key('com-ajeno'))
+        .send({
+          email: `rep-ajeno-${runId}@test.com`,
+          password: 'password123',
+          role: 'comercio',
+        })
+        .expect(201);
+
+      const r = await http()
+        .get('/api/v1/ordenes/resenas/mias')
+        .set('Authorization', `Bearer ${(otro.body as TokensBody).accessToken}`)
+        .expect(200);
+      expect((r.body as { total: number }).total).toBe(0);
+    });
+
+    it('un comprador no puede pedirlas', async () => {
+      await http()
+        .get('/api/v1/ordenes/resenas/mias')
+        .set('Authorization', `Bearer ${compradores[0]}`)
+        .expect(403);
+    });
+  });
+
   describe('señales de reseña amañada', () => {
     it('marca la primera reseña de una cuenta recién creada', async () => {
       const novato = await http()

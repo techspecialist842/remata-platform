@@ -5,6 +5,7 @@ import '../datos/modelos.dart';
 import '../datos/repositorio.dart';
 import '../design/componentes.dart';
 import '../design/tokens.dart';
+import 'reportar.dart';
 
 /// Detalle del rescate y confirmación de compra.
 class PantallaDetalle extends StatefulWidget {
@@ -74,10 +75,48 @@ class _PantallaDetalleState extends State<PantallaDetalle> {
     }
   }
 
+  Future<void> _reportar() async {
+    final enviado = await mostrarDialogoReporte(
+      context,
+      repo: widget.repo,
+      rescateId: widget.rescateId,
+    );
+    if (!enviado || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Gracias. Un moderador va a revisarla; mientras tanto sigue '
+          'disponible.',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Detalle')),
+      appBar: AppBar(
+        title: const Text('Detalle'),
+        actions: [
+          // Reportar vive en el menú y no en un botón a la vista: es una
+          // acción poco frecuente, y ponerla junto a «Reservar» invitaría a
+          // pulsarla por error.
+          PopupMenuButton<String>(
+            tooltip: 'Más opciones',
+            onSelected: (_) => _reportar(),
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'reportar',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.flag_outlined),
+                  title: Text('Reportar publicación'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
       body: FutureBuilder<Rescate>(
         future: _futuro,
         builder: (context, snap) {

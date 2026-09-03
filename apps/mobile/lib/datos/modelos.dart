@@ -335,3 +335,54 @@ class Pagina<T> {
         total: j['total'] as int,
       );
 }
+
+/// Motivo por el que alguien reporta una publicación.
+///
+/// El texto que se muestra vive aquí, junto al valor que entiende el servidor,
+/// para que no puedan separarse: una etiqueta suelta en la pantalla acaba
+/// diciendo una cosa mientras se envía otra.
+enum MotivoReporte {
+  enganoso('enganoso', 'No es lo que dice ser'),
+  precioIncorrecto('precio_incorrecto', 'El precio no coincide'),
+  inseguro('inseguro', 'Está en mal estado o es riesgoso'),
+  noDisponible('no_disponible', 'El comercio no lo tiene'),
+  otro('otro', 'Otro motivo');
+
+  const MotivoReporte(this.valor, this.etiqueta);
+
+  /// Lo que viaja al servidor.
+  final String valor;
+
+  /// Lo que lee la persona.
+  final String etiqueta;
+}
+
+/// Una reseña recibida por el comercio, con su respuesta si ya la dio.
+class ResenaRecibida {
+  ResenaRecibida({
+    required this.id,
+    required this.calificacion,
+    required this.comentario,
+    required this.respuesta,
+    required this.createdAt,
+  });
+
+  final String id;
+  final int calificacion;
+  final String? comentario;
+  final String? respuesta;
+  final DateTime createdAt;
+
+  /// Solo se puede responder una vez. Quien ya respondió no vuelve a hacerlo.
+  bool get puedeResponder => respuesta == null;
+
+  factory ResenaRecibida.desdeJson(Map<String, dynamic> j) => ResenaRecibida(
+        id: j['id'] as String,
+        calificacion: j['calificacion'] as int,
+        comentario: j['comentario'] as String?,
+        respuesta: j['respuesta'] as String?,
+        createdAt:
+            DateTime.tryParse(j['createdAt'] as String? ?? '')?.toLocal() ??
+                DateTime.now(),
+      );
+}

@@ -4,6 +4,7 @@ import '../datos/repositorio.dart';
 import '../datos/ubicacion.dart';
 import '../design/componentes.dart';
 import '../design/tokens.dart';
+import 'resenas_comercio.dart';
 
 /// Cuenta del comercio: quién es y cómo lo están calificando.
 ///
@@ -97,6 +98,10 @@ class _PantallaCuentaComercioState extends State<PantallaCuentaComercio> {
                 const Text('Tu reputación', style: RTokens.titleM),
                 const SizedBox(height: RTokens.s3),
                 _Reputacion(reputacion: datos.reputacion),
+                const SizedBox(height: RTokens.s4),
+                // La nota resumida no basta para ejercer el derecho de
+                // réplica: hace falta ver a qué se responde.
+                SeccionResenas(repo: widget.repo),
                 const SizedBox(height: RTokens.s5),
                 Container(
                   padding: const EdgeInsets.all(RTokens.s4),

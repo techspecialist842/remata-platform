@@ -136,6 +136,21 @@ export class OrdenesController {
     return this.ordenes.cancelar(user.userId, id, dto.motivo, dto.nota);
   }
 
+  @Get('resenas/mias')
+  @Roles(Role.COMERCIO)
+  @ApiOperation({
+    summary: 'Reseñas recibidas por mi comercio',
+    description:
+      'Las más recientes primero, con la respuesta del comercio si ya la tiene. El comercio se toma de la sesión: no se puede pedir las reseñas de otro.',
+  })
+  @ApiErrorResponses(400)
+  misResenas(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.resenas.mias(user.userId, query.page, query.pageSize);
+  }
+
   @Post('resenas/:id/responder')
   @Roles(Role.COMERCIO)
   @ApiOperation({
