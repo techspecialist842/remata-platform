@@ -45,6 +45,11 @@ dependencies:
   geolocator: ^14.0.3
   qr_flutter: ^4.1.0
 
+  # Mapa de ofertas cercanas. La clave no vive aquí: entra por
+  # android/mapas.properties y ios/Flutter/Mapas.xcconfig, ambos fuera del
+  # control de versiones. Ver MAPAS.md.
+  google_maps_flutter: ^2.9.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

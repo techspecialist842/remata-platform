@@ -316,6 +316,13 @@ export class CatalogoService {
       });
 
       qb.addSelect(HAVERSINE_KM, 'distancia_km');
+      // El punto de retiro viaja con la oferta para que el mapa pueda
+      // dibujarla. Sin esto la app sabe a qué distancia está cada rescate
+      // pero no dónde, y tendría que preguntar comercio por comercio.
+      qb.addSelect('m.latitud', 'punto_lat').addSelect(
+        'm.longitud',
+        'punto_lng',
+      );
     }
 
     // Buscando por cercanía manda la distancia; si no, vence antes lo que
@@ -338,10 +345,17 @@ export class CatalogoService {
 
     const { entities, raw } = await qb.getRawAndEntities<{
       distancia_km: string;
+      punto_lat: string | null;
+      punto_lng: string | null;
     }>();
     const items = entities.map((r, i) => ({
       ...conPrecioVigente(r),
       distanciaKm: Math.round(Number(raw[i].distancia_km) * 100) / 100,
+      // Números, no cadenas: PostgreSQL devuelve los decimales como texto para
+      // no perder precisión, y un mapa que recibe "8.98" en vez de 8.98 no
+      // dibuja nada y no dice por qué.
+      puntoLat: raw[i].punto_lat === null ? null : Number(raw[i].punto_lat),
+      puntoLng: raw[i].punto_lng === null ? null : Number(raw[i].punto_lng),
     }));
     return { items, total, page, pageSize };
   }

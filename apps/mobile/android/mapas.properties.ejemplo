@@ -1,0 +1,14 @@
+# Copiar a android/mapas.properties y pegar la clave de Android.
+#
+# Ese archivo NO se sube al repositorio.
+#
+# La clave se saca de Google Cloud > APIs y servicios > Credenciales, del
+# proyecto REMATA, y debe estar restringida a:
+#
+#   - Aplicaciones para Android
+#   - Paquete:  app.remata.remata_movil
+#   - Huella SHA-1 del certificado de firma (ver android/FIRMA.md)
+#
+# Sin la restricción, cualquiera que extraiga la clave del APK puede usarla
+# a costa de la cuenta de facturación del proyecto.
+mapsApiKey=AQUI_LA_CLAVE_DE_ANDROID
