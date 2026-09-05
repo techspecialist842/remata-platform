@@ -9,7 +9,8 @@ FROM node:20-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build \
+RUN mkdir -p public \
+  && npm run build \
   && npm prune --omit=dev
 
 # --- runtime: minimal, non-root ---
@@ -20,6 +21,10 @@ RUN addgroup -S nodejs && adduser -S nestjs -G nodejs
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
+# La aplicación web, si el despliegue la construyó. La carpeta se crea siempre
+# en la etapa anterior —vacía si no hay app— porque COPY falla cuando el origen
+# no existe, y el servidor está escrito para funcionar igual sin ella.
+COPY --from=build /app/public ./public
 USER nestjs
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \

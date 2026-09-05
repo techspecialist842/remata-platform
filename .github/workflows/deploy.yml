@@ -38,6 +38,36 @@ jobs:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      # La aplicación web se construye aquí y viaja dentro de la misma imagen
+      # que la API, de modo que se sirve desde el mismo dominio. Eso evita un
+      # dominio aparte, un certificado aparte y la configuración de orígenes
+      # cruzados: al ser el mismo origen, ese problema no existe.
+      #
+      # --no-web-resources-cdn deja los recursos dentro del paquete en vez de
+      # traerlos de un CDN externo, que la política de seguridad no permite.
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.8'
+          cache: true
+
+      - name: Construir la aplicación web
+        working-directory: apps/mobile
+        env:
+          ENVIRONMENT: ${{ inputs.environment || 'staging' }}
+        run: |
+          set -euo pipefail
+          # La dirección de la API se compila dentro de la aplicación. Es el
+          # mismo dominio desde el que se sirve, pero hay que decirlo: el
+          # paquete no sabe dónde va a acabar alojado.
+          case "$ENVIRONMENT" in
+            prod) API=https://remata.app ;;
+            *)    API=https://$ENVIRONMENT.remata.app ;;
+          esac
+          flutter pub get
+          flutter build web --release --no-web-resources-cdn             --dart-define=REMATA_API="$API"
+          rm -rf ../api/public
+          cp -r build/web ../api/public
+
       - uses: aws-actions/amazon-ecr-login@v2
         id: ecr-login
 

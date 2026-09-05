@@ -249,12 +249,36 @@ describe('Seguridad (e2e)', () => {
       return Date.now() - t0;
     };
 
-    const existente = await medir(email);
-    const inexistente = await medir(`no-existe-${runId}@test.com`);
+    // Varias medidas y mediana, no una sola toma.
+    //
+    // Con una toma de cada, esta prueba falla sola de vez en cuando en una
+    // máquina compartida: basta que el runner se distraiga en el momento
+    // equivocado. Y un guardián que falla al azar se acaba reintentando por
+    // costumbre, con lo que el día que detecte algo real también se
+    // reintentará. La mediana de varias medidas absorbe ese ruido sin aflojar
+    // el margen, que es lo que de verdad protege.
+    //
+    // Se alternan a propósito: medir primero todas las de un lado y luego las
+    // del otro trasladaría cualquier lentitud pasajera a un solo grupo.
+    const MUESTRAS = 5;
+    const conCuenta: number[] = [];
+    const sinCuenta: number[] = [];
+    for (let i = 0; i < MUESTRAS; i++) {
+      conCuenta.push(await medir(email));
+      sinCuenta.push(await medir(`no-existe-${runId}-${i}@test.com`));
+    }
 
-    // Con la comparación de coste constante, ambos deben tardar parecido.
-    // El margen es amplio porque una máquina compartida introduce ruido; lo
-    // que se detecta es el orden de magnitud, que es lo que se explotaba.
+    const mediana = (xs: number[]) => {
+      const orden = [...xs].sort((a, b) => a - b);
+      return orden[Math.floor(orden.length / 2)];
+    };
+
+    const existente = mediana(conCuenta);
+    const inexistente = mediana(sinCuenta);
+
+    // Con la comparación de coste constante, ambos deben tardar parecido. Lo
+    // que se detecta es el orden de magnitud: la diferencia que se explotaba
+    // era de unas quince veces, no de un puñado de milisegundos.
     const proporcion =
       Math.max(existente, inexistente) /
       Math.max(1, Math.min(existente, inexistente));

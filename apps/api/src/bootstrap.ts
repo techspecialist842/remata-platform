@@ -4,7 +4,9 @@ import {
   ValidationPipe,
   VersioningType,
 } from '@nestjs/common';
-import { json, urlencoded } from 'express';
+import { join } from 'path';
+import { existsSync } from 'fs';
+import { json, urlencoded, static as expressStatic } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import { correlationId } from './common/middleware/correlation-id.middleware';
 
@@ -103,10 +105,62 @@ export function configureApp(app: INestApplication): void {
       },
     },
   });
+  // La aplicación web necesita más margen que la API, y por motivos concretos:
+  // Flutter compila a WebAssembly, dibuja en un hilo aparte y carga sus propias
+  // fuentes e imágenes. Con la política estricta el navegador la bloquea y la
+  // pantalla se queda en blanco sin decir por qué.
+  //
+  // Se le da su propio perfil en vez de relajar el de la API: lo que necesita
+  // una página no tiene por qué aflojarse en los endpoints que mueven dinero.
+  //
+  // Casi todo es del propio dominio: la aplicación se compila con sus
+  // recursos incluidos en vez de traerlos de un CDN.
+  //
+  // La excepción son las fuentes. El motor de dibujo de Flutter descarga de
+  // Google las que le faltan para los caracteres que no trae la aplicación, y
+  // sin permitirlo el navegador bloquea cientos de peticiones: la pantalla se
+  // dibuja, pero algunos caracteres salen mal.
+  //
+  // Se permiten dos servidores concretos de Google y solo para fuentes. No es
+  // un comodín, y no aplica a la API.
+  const appHelmet = helmet({
+    hsts,
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        ...baseCsp,
+        'default-src': [`'self'`],
+        'script-src': [
+          `'self'`,
+          `'unsafe-inline'`,
+          `'unsafe-eval'`,
+          `'wasm-unsafe-eval'`,
+        ],
+        'style-src': [`'self'`, `'unsafe-inline'`],
+        'img-src': [`'self'`, 'data:', 'blob:'],
+        'font-src': [`'self'`, 'data:', 'https://fonts.gstatic.com'],
+        // El hilo de dibujo de Flutter y su trabajador de red viven en blobs.
+        'worker-src': [`'self'`, 'blob:'],
+        'child-src': [`'self'`, 'blob:'],
+        'connect-src': [
+          `'self'`,
+          'data:',
+          'blob:',
+          // Las fuentes se piden por fetch, no con una etiqueta: sin esto,
+          // font-src por sí solo no basta.
+          'https://fonts.gstatic.com',
+        ],
+      },
+    },
+  });
+
   app.use((req: Request, res: Response, next: NextFunction) => {
+    if (!req.path.startsWith('/api')) return appHelmet(req, res, next);
     const relaxed = req.path.startsWith('/api/docs');
     (relaxed ? relaxedHelmet : strictHelmet)(req, res, next);
   });
+
+  servirAplicacionWeb(app);
 
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
   app.setGlobalPrefix('api');
@@ -117,4 +171,44 @@ export function configureApp(app: INestApplication): void {
       forbidNonWhitelisted: true,
     }),
   );
+}
+
+/**
+ * Sirve la aplicación web desde el mismo dominio que la API.
+ *
+ * El mismo origen no es una comodidad: es lo que hace que no haga falta
+ * configurar orígenes cruzados, ni un dominio aparte, ni un certificado. Una
+ * dirección menos que mantener y una clase entera de problemas que no existe.
+ *
+ * Si la carpeta no está —en las pruebas, o en una imagen construida sin la
+ * app— esto no hace nada y la API se comporta exactamente como antes. Es
+ * deliberado: el servidor no debe depender de que alguien haya compilado la
+ * aplicación.
+ */
+function servirAplicacionWeb(app: INestApplication): void {
+  const raiz = join(__dirname, '..', 'public');
+  if (!existsSync(join(raiz, 'index.html'))) return;
+
+  const estaticos = expressStatic(raiz, {
+    // El index se sirve abajo, para que cualquier ruta desconocida caiga en él
+    // y no en un 404. Es una aplicación de una sola página: las rutas las
+    // resuelve ella, no el servidor.
+    index: false,
+  });
+
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    // Todo lo de la API va bajo /api. Lo demás es la aplicación.
+    //
+    // Se descarta /api antes de mirar el disco: montar los estáticos en la
+    // raíz haría que cada petición de la API buscara primero un archivo con
+    // ese nombre. No se nota en una medición suelta, pero es trabajo inútil en
+    // el camino de todas las peticiones.
+    if (req.path.startsWith('/api')) return next();
+    estaticos(req, res, () => {
+      // No es un archivo: se lo queda la aplicación, que resuelve sus propias
+      // rutas.
+      if (req.method !== 'GET') return next();
+      res.sendFile(join(raiz, 'index.html'));
+    });
+  });
 }
