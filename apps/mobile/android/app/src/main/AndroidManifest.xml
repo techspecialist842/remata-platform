@@ -28,7 +28,14 @@
                  the Android process has started. This theme is visible to the user
                  while the Flutter UI initializes. After that, this theme continues
                  to determine the Window background behind the Flutter UI. -->
-            <meta-data
+            <!-- La clave de Google Maps la inyecta Gradle desde
+             android/mapas.properties, que no está en el control de versiones.
+             Vacía si no hay clave: el mapa lo dice, el resto de la app
+             funciona igual. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${mapsApiKey}" />
+        <meta-data
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />

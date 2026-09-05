@@ -4,6 +4,7 @@ import '../datos/ubicacion.dart';
 import '../datos/repositorio.dart';
 import '../design/componentes.dart';
 import '../design/tokens.dart';
+import 'mapa.dart';
 import 'detalle.dart';
 
 /// Catálogo: buscador y listado de ofertas vigentes.
@@ -80,6 +81,27 @@ class _PantallaCatalogoState extends State<PantallaCatalogo> {
     }
   }
 
+  /// Abre el mapa con lo que la lista ya encontró.
+  ///
+  /// No vuelve a buscar: se le pasan las mismas ofertas. Repetir la consulta
+  /// mostraría un resultado distinto del que la persona acaba de ver, sin que
+  /// nada explique por qué cambió.
+  Future<void> _verEnMapa() async {
+    final centro = _cerca;
+    if (centro == null) return;
+    final pagina = await _futuro;
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PantallaMapa(
+          ofertas: pagina.items,
+          centro: centro,
+          repo: widget.repo,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -114,9 +136,9 @@ class _PantallaCatalogoState extends State<PantallaCatalogo> {
                     ),
                   ),
                   const SizedBox(height: RTokens.s3),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: FilterChip(
+                  Row(
+                    children: [
+                      FilterChip(
                       selected: _cerca != null,
                       onSelected:
                           _ubicando ? null : (_) => _alternarCercania(),
@@ -133,9 +155,20 @@ class _PantallaCatalogoState extends State<PantallaCatalogo> {
                               size: 18,
                             ),
                       label: Text(
-                        _cerca != null ? 'Cerca de ti (5 km)' : 'Cerca de ti',
+                          _cerca != null ? 'Cerca de ti (5 km)' : 'Cerca de ti',
+                        ),
                       ),
-                    ),
+                      const Spacer(),
+                      // El mapa solo aparece con la cercanía encendida. Sin
+                      // ubicación no hay dónde centrarlo, y un mapa que no sabe
+                      // dónde estás no responde la pregunta que se le hace.
+                      if (_cerca != null)
+                        TextButton.icon(
+                          onPressed: _verEnMapa,
+                          icon: const Icon(Icons.map_outlined, size: 18),
+                          label: const Text('Ver en mapa'),
+                        ),
+                    ],
                   ),
                 ],
               ),

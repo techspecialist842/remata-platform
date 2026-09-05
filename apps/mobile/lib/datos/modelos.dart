@@ -84,6 +84,8 @@ class Rescate {
     required this.validoDesde,
     required this.validoHasta,
     this.distanciaKm,
+    this.puntoLat,
+    this.puntoLng,
   });
 
   final String id;
@@ -102,6 +104,17 @@ class Rescate {
 
   /// Solo llega cuando se buscó por cercanía; nula en el resto de búsquedas.
   final double? distanciaKm;
+
+  /// Dónde se retira: el punto del comercio, no del rescate.
+  ///
+  /// Solo llega en las búsquedas por cercanía, que son las únicas que lo
+  /// necesitan. Sin él la app sabe a qué distancia está una oferta pero no
+  /// dónde, y no hay forma de dibujarla en un mapa.
+  final double? puntoLat;
+  final double? puntoLng;
+
+  /// Una oferta solo se puede poner en el mapa si trae las dos coordenadas.
+  bool get tienePunto => puntoLat != null && puntoLng != null;
 
   /// Unidades ya comprometidas. El comercio necesita saberlo antes de pausar:
   /// pausar no cancela las reservas que ya existen.
@@ -134,6 +147,8 @@ class Rescate {
             : DateTime.parse(j['validoDesde'] as String).toLocal(),
         validoHasta: DateTime.parse(j['validoHasta'] as String).toLocal(),
         distanciaKm: _aDouble(j['distanciaKm']),
+        puntoLat: _aDouble(j['puntoLat']),
+        puntoLng: _aDouble(j['puntoLng']),
       );
 }
 

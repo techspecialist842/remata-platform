@@ -15,15 +15,30 @@ plugins {
 // puede volver a publicar una actualización — hay que publicar una aplicación
 // nueva y pedirle a cada usuario que la instale de cero.
 //
-// Si el archivo no existe, la compilación de release sigue funcionando con la
-// clave de depuración. Eso permite probar el APK localmente sin tener el
-// secreto, pero el resultado NO es publicable. Ver android/FIRMA.md.
+// Si el archivo no existe, la compilación de release FALLA a propósito (ver más
+// abajo). Para probar en local sin el secreto hay una salida explícita.
+// Ver android/FIRMA.md.
 val propsFirma = Properties()
 val archivoFirma = rootProject.file("key.properties")
 val hayFirmaReal = archivoFirma.exists()
 if (hayFirmaReal) {
     propsFirma.load(FileInputStream(archivoFirma))
 }
+
+// Clave de Google Maps.
+//
+// Vive en android/mapas.properties, fuera del control de versiones. A
+// diferencia de la firma, su ausencia NO detiene la compilación: el mapa es un
+// añadido y todo lo demás —incluida la búsqueda por cercanía— funciona sin él.
+//
+// Sin clave, el mapa se dibuja gris y vacío. Eso ocurre dentro del SDK nativo
+// y la app no puede sustituirlo por un mensaje; queda avisado en MAPAS.md.
+val propsMapas = Properties()
+val archivoMapas = rootProject.file("mapas.properties")
+if (archivoMapas.exists()) {
+    propsMapas.load(FileInputStream(archivoMapas))
+}
+val claveMapas = (propsMapas["mapsApiKey"] as String?) ?: ""
 
 android {
     namespace = "app.remata.remata_movil"
@@ -41,6 +56,11 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // El SDK de mapas lee la clave del manifiesto, así que se inyecta aquí
+        // en vez de escribirla en el archivo: el manifiesto sí está en el
+        // control de versiones.
+        manifestPlaceholders["mapsApiKey"] = claveMapas
     }
 
     signingConfigs {

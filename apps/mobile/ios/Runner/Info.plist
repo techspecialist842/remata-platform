@@ -9,6 +9,12 @@
 	-->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>REMATA usa tu ubicación para mostrarte las ofertas de comercios cercanos.</string>
+	<!-- Clave de Google Maps. El valor real lo pone
+	     ios/Flutter/Mapas.xcconfig, que no está en el control de versiones.
+	     Si ese archivo no existe queda la variable sin sustituir, y
+	     AppDelegate lo detecta y no inicializa el SDK. -->
+	<key>GMSApiKey</key>
+	<string>$(MAPS_API_KEY)</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

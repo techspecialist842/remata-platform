@@ -32,3 +32,6 @@ Runner/GeneratedPluginRegistrant.*
 !default.mode2v3
 !default.pbxuser
 !default.perspectivev3
+
+# Clave de Google Maps. Fuera del control de versiones, como en Android.
+Flutter/Mapas.xcconfig

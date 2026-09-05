@@ -32,7 +32,13 @@ interface RescateBody {
   id: string;
 }
 interface Pagina {
-  items: { id: string; titulo: string; distanciaKm?: number }[];
+  items: {
+    id: string;
+    titulo: string;
+    distanciaKm?: number;
+    puntoLat?: number | null;
+    puntoLng?: number | null;
+  }[];
   total: number;
 }
 
@@ -150,6 +156,28 @@ describe('Catálogo por cercanía (e2e)', () => {
     const p = await buscarCerca(CINTA, 17);
 
     expect(idsDe(p)).not.toContain(lejos.rescateId);
+  });
+
+  // Sin las coordenadas, la app sabe a qué distancia está cada rescate pero
+  // no dónde: no hay forma de dibujarlo en un mapa sin preguntar comercio por
+  // comercio.
+  it('cada oferta cercana trae el punto de retiro', async () => {
+    const p = await buscarCerca(CINTA, 25);
+    const casco = p.items.find((i) => i.id === cerca.rescateId)!;
+
+    expect(casco.puntoLat).toBeCloseTo(CASCO.lat, 2);
+    expect(casco.puntoLng).toBeCloseTo(CASCO.lng, 2);
+  });
+
+  // Números, no cadenas. PostgreSQL devuelve los decimales como texto para no
+  // perder precisión, y un mapa que recibe "8.953" en vez de 8.953 no dibuja
+  // nada y no explica por qué.
+  it('las coordenadas llegan como números', async () => {
+    const p = await buscarCerca(CINTA, 25);
+    const casco = p.items.find((i) => i.id === cerca.rescateId)!;
+
+    expect(typeof casco.puntoLat).toBe('number');
+    expect(typeof casco.puntoLng).toBe('number');
   });
 
   it('calcula la distancia con precisión razonable', async () => {

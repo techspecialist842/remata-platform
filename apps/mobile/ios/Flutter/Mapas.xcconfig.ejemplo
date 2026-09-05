@@ -1,0 +1,13 @@
+// Copiar a ios/Flutter/Mapas.xcconfig y pegar la clave de iOS.
+//
+// Ese archivo NO se sube al repositorio.
+//
+// La clave se saca de Google Cloud > APIs y servicios > Credenciales, del
+// proyecto REMATA, y debe estar restringida a:
+//
+//   - Aplicaciones para iOS
+//   - Identificador del paquete:  app.remata.remataMovil
+//
+// Es una clave distinta de la de Android. Compartir una sola entre ambas
+// obliga a dejarla sin restringir, que es justo lo que hay que evitar.
+MAPS_API_KEY=AQUI_LA_CLAVE_DE_IOS

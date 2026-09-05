@@ -16,3 +16,6 @@ key.properties
 # Artefactos de compilación de Gradle. La regla /build/ del nivel superior
 # no los cubre: solo alcanza a apps/mobile/build.
 /build/
+
+# Clave de Google Maps. Como key.properties: fuera del control de versiones.
+mapas.properties
