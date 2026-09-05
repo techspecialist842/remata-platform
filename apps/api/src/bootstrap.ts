@@ -6,8 +6,7 @@ import {
 } from '@nestjs/common';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import { json, urlencoded } from 'express';
-import type { NestExpressApplication } from '@nestjs/platform-express';
+import { json, urlencoded, static as expressStatic } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import { correlationId } from './common/middleware/correlation-id.middleware';
 
@@ -190,8 +189,7 @@ function servirAplicacionWeb(app: INestApplication): void {
   const raiz = join(__dirname, '..', 'public');
   if (!existsSync(join(raiz, 'index.html'))) return;
 
-  const express = app as NestExpressApplication;
-  express.useStaticAssets(raiz, {
+  const estaticos = expressStatic(raiz, {
     // El index se sirve abajo, para que cualquier ruta desconocida caiga en él
     // y no en un 404. Es una aplicación de una sola página: las rutas las
     // resuelve ella, no el servidor.
@@ -200,7 +198,17 @@ function servirAplicacionWeb(app: INestApplication): void {
 
   app.use((req: Request, res: Response, next: NextFunction) => {
     // Todo lo de la API va bajo /api. Lo demás es la aplicación.
-    if (req.method !== 'GET' || req.path.startsWith('/api')) return next();
-    res.sendFile(join(raiz, 'index.html'));
+    //
+    // Se descarta /api antes de mirar el disco: montar los estáticos en la
+    // raíz haría que cada petición de la API buscara primero un archivo con
+    // ese nombre. No se nota en una medición suelta, pero es trabajo inútil en
+    // el camino de todas las peticiones.
+    if (req.path.startsWith('/api')) return next();
+    estaticos(req, res, () => {
+      // No es un archivo: se lo queda la aplicación, que resuelve sus propias
+      // rutas.
+      if (req.method !== 'GET') return next();
+      res.sendFile(join(raiz, 'index.html'));
+    });
   });
 }
